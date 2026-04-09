@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FX & Freight Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>FX & Freight Dashboard</h1>
+            <div class="live-indicator">
+                <span class="pulse"></span>
+                <span id="last-updated">Loading...</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Rate Cards Summary -->
+        <section class="rate-cards">
+            <div class="rate-card" id="card-eurgbp">
+                <div class="rate-label">EUR / GBP</div>
+                <div class="rate-value" id="rate-eurgbp">--</div>
+                <div class="rate-change" id="change-eurgbp">--</div>
+            </div>
+            <div class="rate-card" id="card-eurcny">
+                <div class="rate-label">EUR / CNY</div>
+                <div class="rate-value" id="rate-eurcny">--</div>
+                <div class="rate-change" id="change-eurcny">--</div>
+            </div>
+            <div class="rate-card" id="card-freight">
+                <div class="rate-label">Container Freight (FBX)</div>
+                <div class="rate-value" id="rate-freight">--</div>
+                <div class="rate-change" id="change-freight">--</div>
+            </div>
+        </section>
+
+        <!-- EUR/GBP Chart -->
+        <section class="chart-panel">
+            <div class="chart-header">
+                <h2>EUR / GBP Exchange Rate</h2>
+                <div class="time-range-selector" data-chart="eurgbp">
+                    <button class="range-btn" data-range="1D">1D</button>
+                    <button class="range-btn active" data-range="30D">30D</button>
+                    <button class="range-btn" data-range="6M">6M</button>
+                    <button class="range-btn" data-range="1Y">1Y</button>
+                    <button class="range-btn" data-range="5Y">5Y</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-eurgbp"></canvas>
+            </div>
+        </section>
+
+        <!-- EUR/CNY Chart -->
+        <section class="chart-panel">
+            <div class="chart-header">
+                <h2>EUR / CNY Exchange Rate</h2>
+                <div class="time-range-selector" data-chart="eurcny">
+                    <button class="range-btn" data-range="1D">1D</button>
+                    <button class="range-btn active" data-range="30D">30D</button>
+                    <button class="range-btn" data-range="6M">6M</button>
+                    <button class="range-btn" data-range="1Y">1Y</button>
+                    <button class="range-btn" data-range="5Y">5Y</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-eurcny"></canvas>
+            </div>
+        </section>
+
+        <!-- Freight Container Prices Chart -->
+        <section class="chart-panel">
+            <div class="chart-header">
+                <h2>Global Container Freight Index (FBX)</h2>
+                <div class="time-range-selector" data-chart="freight">
+                    <button class="range-btn" data-range="1D">1D</button>
+                    <button class="range-btn active" data-range="30D">30D</button>
+                    <button class="range-btn" data-range="6M">6M</button>
+                    <button class="range-btn" data-range="1Y">1Y</button>
+                    <button class="range-btn" data-range="5Y">5Y</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-freight"></canvas>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>FX data from <a href="https://frankfurter.dev" target="_blank">Frankfurter API</a> (ECB rates) &bull; Freight data from <a href="https://fbx.freightos.com" target="_blank">Freightos Baltic Index</a> &bull; Auto-refreshes every 60s</p>
+    </footer>
+
+    <script src="js/api.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
