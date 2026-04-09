@@ -4,56 +4,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FX &amp; Freight Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --bg-primary: #0f1923; --bg-secondary: #1a2733; --bg-card: #1e3044;
-            --border: #2a4a6b; --text-primary: #e8edf2; --text-secondary: #8899aa;
-            --accent: #4fc3f7; --green: #66bb6a; --red: #ef5350;
-            --shadow: 0 4px 24px rgba(0,0,0,0.3);
-        }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.6; min-height: 100vh; }
-        header { background: var(--bg-secondary); border-bottom: 1px solid var(--border); padding: 1rem 2rem; position: sticky; top: 0; z-index: 100; }
-        .header-content { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background: #0f1923; color: #e8edf2; line-height: 1.6; }
+        header { background: #1a2733; border-bottom: 1px solid #2a4a6b; padding: 1rem 2rem; position: sticky; top: 0; z-index: 100; }
+        .header-content { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
         header h1 { font-size: 1.5rem; font-weight: 600; }
-        .live-indicator { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary); }
-        .pulse { width: 8px; height: 8px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+        .live-indicator { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #8899aa; }
+        .pulse { width: 8px; height: 8px; background: #66bb6a; border-radius: 50%; animation: pulse 2s infinite; }
         @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(102,187,106,0.7)} 50%{opacity:0.7;box-shadow:0 0 0 6px rgba(102,187,106,0)} }
         main { max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
+        #status-bar { background: #1a2733; border: 1px solid #2a4a6b; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #8899aa; }
+        #status-bar.error { border-color: #ef5350; color: #ef5350; }
+        #status-bar.success { border-color: #66bb6a; color: #66bb6a; }
         .rate-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-        .rate-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; transition: transform 0.2s, box-shadow 0.2s; }
-        .rate-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
-        .rate-label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+        .rate-card { background: #1e3044; border: 1px solid #2a4a6b; border-radius: 12px; padding: 1.25rem 1.5rem; transition: transform 0.2s; }
+        .rate-card:hover { transform: translateY(-2px); }
+        .rate-label { font-size: 0.85rem; color: #8899aa; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
         .rate-value { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-        .rate-change { font-size: 0.9rem; margin-top: 0.25rem; font-weight: 500; font-variant-numeric: tabular-nums; }
-        .rate-change.positive { color: var(--green); }
-        .rate-change.negative { color: var(--red); }
-        .chart-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow); }
+        .rate-change { font-size: 0.9rem; margin-top: 0.25rem; font-weight: 500; }
+        .rate-change.up { color: #66bb6a; }
+        .rate-change.down { color: #ef5350; }
+        .chart-panel { background: #1e3044; border: 1px solid #2a4a6b; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
         .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem; }
         .chart-header h2 { font-size: 1.1rem; font-weight: 600; }
-        .data-source { font-size: 0.7rem; color: var(--text-secondary); font-style: italic; }
-        .time-range-selector { display: flex; gap: 0.25rem; background: var(--bg-primary); border-radius: 8px; padding: 3px; }
-        .range-btn { background: transparent; border: none; color: var(--text-secondary); padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .range-btn:hover { color: var(--text-primary); background: rgba(79,195,247,0.1); }
-        .range-btn.active { background: var(--accent); color: var(--bg-primary); }
-        .chart-container { position: relative; height: 350px; width: 100%; }
-        .chart-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(30,48,68,0.85); border-radius: 8px; z-index: 10; }
-        .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        .chart-source { font-size: 0.7rem; color: #66bb6a; margin-top: 2px; }
+        .range-bar { display: flex; gap: 0.25rem; background: #0f1923; border-radius: 8px; padding: 3px; }
+        .range-bar button { background: transparent; border: none; color: #8899aa; padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .range-bar button:hover { color: #e8edf2; background: rgba(79,195,247,0.1); }
+        .range-bar button.on { background: #4fc3f7; color: #0f1923; }
+        .chart-box { position: relative; height: 350px; }
+        .chart-box .loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(30,48,68,0.85); border-radius: 8px; z-index: 10; }
+        .chart-box .loading div { width: 32px; height: 32px; border: 3px solid #2a4a6b; border-top-color: #4fc3f7; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        footer { text-align: center; padding: 1.5rem 2rem; color: var(--text-secondary); font-size: 0.8rem; border-top: 1px solid var(--border); }
-        footer a { color: var(--accent); text-decoration: none; }
-        footer a:hover { text-decoration: underline; }
-        .error-toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--red); color: white; padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.85rem; font-weight: 500; box-shadow: 0 4px 16px rgba(239,83,80,0.4); z-index: 1000; animation: slideIn 0.3s ease; }
-        @keyframes slideIn { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+        footer { text-align: center; padding: 1.5rem 2rem; color: #8899aa; font-size: 0.8rem; border-top: 1px solid #2a4a6b; }
+        footer a { color: #4fc3f7; text-decoration: none; }
         @media (max-width: 768px) {
             header { padding: 1rem; } main { padding: 1rem; }
-            .header-content { flex-direction: column; gap: 0.5rem; text-align: center; }
+            .header-content { flex-direction: column; text-align: center; }
             .chart-header { flex-direction: column; align-items: flex-start; }
-            .chart-container { height: 260px; }
-            .rate-value { font-size: 1.5rem; }
+            .chart-box { height: 260px; } .rate-value { font-size: 1.5rem; }
         }
     </style>
 </head>
@@ -61,399 +51,357 @@
     <header>
         <div class="header-content">
             <h1>FX &amp; Freight Dashboard</h1>
-            <div class="live-indicator">
-                <span class="pulse"></span>
-                <span id="last-updated">Loading...</span>
-            </div>
+            <div class="live-indicator"><span class="pulse"></span><span id="last-updated">Loading...</span></div>
         </div>
     </header>
     <main>
+        <div id="status-bar">Connecting to live data feeds...</div>
         <section class="rate-cards">
-            <div class="rate-card">
-                <div class="rate-label">EUR / GBP</div>
-                <div class="rate-value" id="rate-eurgbp">--</div>
-                <div class="rate-change" id="change-eurgbp">--</div>
-            </div>
-            <div class="rate-card">
-                <div class="rate-label">EUR / CNY</div>
-                <div class="rate-value" id="rate-eurcny">--</div>
-                <div class="rate-change" id="change-eurcny">--</div>
-            </div>
-            <div class="rate-card">
-                <div class="rate-label">Container Freight (FBX)</div>
-                <div class="rate-value" id="rate-freight">--</div>
-                <div class="rate-change" id="change-freight">--</div>
-            </div>
+            <div class="rate-card"><div class="rate-label">EUR / GBP</div><div class="rate-value" id="rv-eurgbp">--</div><div class="rate-change" id="rc-eurgbp"></div></div>
+            <div class="rate-card"><div class="rate-label">EUR / CNY</div><div class="rate-value" id="rv-eurcny">--</div><div class="rate-change" id="rc-eurcny"></div></div>
+            <div class="rate-card"><div class="rate-label">Container Freight (FBX)</div><div class="rate-value" id="rv-freight">--</div><div class="rate-change" id="rc-freight"></div></div>
         </section>
+
         <section class="chart-panel">
             <div class="chart-header">
-                <div><h2>EUR / GBP Exchange Rate</h2><div class="data-source" id="source-eurgbp"></div></div>
-                <div class="time-range-selector" data-chart="eurgbp">
-                    <button class="range-btn" data-range="1D">1D</button>
-                    <button class="range-btn active" data-range="30D">30D</button>
-                    <button class="range-btn" data-range="6M">6M</button>
-                    <button class="range-btn" data-range="1Y">1Y</button>
-                    <button class="range-btn" data-range="5Y">5Y</button>
+                <div><h2>EUR / GBP Exchange Rate</h2><div class="chart-source" id="src-eurgbp"></div></div>
+                <div class="range-bar" data-key="eurgbp">
+                    <button data-r="1D">1D</button><button data-r="30D" class="on">30D</button><button data-r="6M">6M</button><button data-r="1Y">1Y</button><button data-r="5Y">5Y</button>
                 </div>
             </div>
-            <div class="chart-container"><canvas id="chart-eurgbp"></canvas></div>
+            <div class="chart-box" id="box-eurgbp"><canvas id="cv-eurgbp"></canvas></div>
         </section>
+
         <section class="chart-panel">
             <div class="chart-header">
-                <div><h2>EUR / CNY Exchange Rate</h2><div class="data-source" id="source-eurcny"></div></div>
-                <div class="time-range-selector" data-chart="eurcny">
-                    <button class="range-btn" data-range="1D">1D</button>
-                    <button class="range-btn active" data-range="30D">30D</button>
-                    <button class="range-btn" data-range="6M">6M</button>
-                    <button class="range-btn" data-range="1Y">1Y</button>
-                    <button class="range-btn" data-range="5Y">5Y</button>
+                <div><h2>EUR / CNY Exchange Rate</h2><div class="chart-source" id="src-eurcny"></div></div>
+                <div class="range-bar" data-key="eurcny">
+                    <button data-r="1D">1D</button><button data-r="30D" class="on">30D</button><button data-r="6M">6M</button><button data-r="1Y">1Y</button><button data-r="5Y">5Y</button>
                 </div>
             </div>
-            <div class="chart-container"><canvas id="chart-eurcny"></canvas></div>
+            <div class="chart-box" id="box-eurcny"><canvas id="cv-eurcny"></canvas></div>
         </section>
+
         <section class="chart-panel">
             <div class="chart-header">
-                <div><h2>Global Container Freight Index (FBX)</h2><div class="data-source" id="source-freight"></div></div>
-                <div class="time-range-selector" data-chart="freight">
-                    <button class="range-btn" data-range="1D">1D</button>
-                    <button class="range-btn active" data-range="30D">30D</button>
-                    <button class="range-btn" data-range="6M">6M</button>
-                    <button class="range-btn" data-range="1Y">1Y</button>
-                    <button class="range-btn" data-range="5Y">5Y</button>
+                <div><h2>Global Container Freight Index</h2><div class="chart-source" id="src-freight"></div></div>
+                <div class="range-bar" data-key="freight">
+                    <button data-r="1D">1D</button><button data-r="30D" class="on">30D</button><button data-r="6M">6M</button><button data-r="1Y">1Y</button><button data-r="5Y">5Y</button>
                 </div>
             </div>
-            <div class="chart-container"><canvas id="chart-freight"></canvas></div>
+            <div class="chart-box" id="box-freight"><canvas id="cv-freight"></canvas></div>
         </section>
     </main>
-    <footer>
-        <p>FX data from <a href="https://frankfurter.app" target="_blank">Frankfurter API</a> (ECB reference rates) &bull; Freight data: Freightos Baltic Index &bull; Auto-refreshes every 60s</p>
-    </footer>
+    <footer>FX rates from ECB via Frankfurter API &bull; Auto-refreshes every 60 seconds</footer>
 
-<script>
-// ═══════════════════════════════════════════════════════════
-// API SERVICE
-// ═══════════════════════════════════════════════════════════
+    <!-- Only one external dependency: Chart.js (no adapters needed) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
-const API = (() => {
-    function dateStr(d) { return d.toISOString().slice(0, 10); }
-    function subtractDays(date, days) { const d = new Date(date); d.setDate(d.getDate() - days); return d; }
-    function rangeToDays(range) { return { '1D': 1, '30D': 30, '6M': 183, '1Y': 365, '5Y': 1826 }[range] || 30; }
-    function rangeToDates(range) { const now = new Date(); return { from: subtractDays(now, rangeToDays(range)), to: now }; }
-
-    // ── Provider 1: Frankfurter (api.frankfurter.app) ────────
-    async function frankfurterTimeSeries(currency, range) {
-        const { from, to } = rangeToDates(range);
-        const url = `https://api.frankfurter.app/${dateStr(from)}..${dateStr(to)}?from=EUR&to=${currency}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Frankfurter error: ${res.status}`);
-        const data = await res.json();
-        const points = Object.entries(data.rates).map(([date, rates]) => ({ date, value: rates[currency] }));
-        points.sort((a, b) => a.date.localeCompare(b.date));
-        return { points, source: 'Live ECB data via Frankfurter API' };
+    <script>
+    // ═══════════════════════════════════════════════════════
+    // STATUS BAR - visible feedback
+    // ═══════════════════════════════════════════════════════
+    const statusBar = document.getElementById('status-bar');
+    function setStatus(msg, type) {
+        statusBar.textContent = msg;
+        statusBar.className = type || '';
+        statusBar.id = 'status-bar';
     }
 
-    async function frankfurterLatest(currency) {
-        const res = await fetch(`https://api.frankfurter.app/latest?from=EUR&to=${currency}`);
-        if (!res.ok) throw new Error(`Frankfurter error: ${res.status}`);
-        const data = await res.json();
-        return { date: data.date, value: data.rates[currency], source: 'frankfurter' };
+    // ═══════════════════════════════════════════════════════
+    // HELPERS
+    // ═══════════════════════════════════════════════════════
+    function fmt(d) { return d.toISOString().slice(0,10); }
+    function ago(days) { const d = new Date(); d.setDate(d.getDate() - days); return d; }
+    const RANGE_DAYS = { '1D':1, '30D':30, '6M':183, '1Y':365, '5Y':1826 };
+
+    // Fetch with timeout
+    function fetchWithTimeout(url, ms = 8000) {
+        return Promise.race([
+            fetch(url),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout')), ms))
+        ]);
     }
 
-    // ── Provider 2: Frankfurter .dev domain ──────────────────
-    async function frankfurterDevTimeSeries(currency, range) {
-        const { from, to } = rangeToDates(range);
-        const url = `https://api.frankfurter.dev/${dateStr(from)}..${dateStr(to)}?from=EUR&to=${currency}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Frankfurter.dev error: ${res.status}`);
-        const data = await res.json();
-        const points = Object.entries(data.rates).map(([date, rates]) => ({ date, value: rates[currency] }));
-        points.sort((a, b) => a.date.localeCompare(b.date));
-        return { points, source: 'Live ECB data via Frankfurter API' };
-    }
+    // ═══════════════════════════════════════════════════════
+    // FX API: frankfurter.app (free, CORS enabled, ECB data)
+    // ═══════════════════════════════════════════════════════
+    async function fetchFX(currency, range) {
+        const days = RANGE_DAYS[range] || 30;
+        const from = fmt(ago(days));
+        const to = fmt(new Date());
 
-    async function frankfurterDevLatest(currency) {
-        const res = await fetch(`https://api.frankfurter.dev/latest?from=EUR&to=${currency}`);
-        if (!res.ok) throw new Error(`Frankfurter.dev error: ${res.status}`);
-        const data = await res.json();
-        return { date: data.date, value: data.rates[currency], source: 'frankfurter.dev' };
-    }
-
-    // ── Provider 3: exchangerate.host ────────────────────────
-    async function exchangerateHostTimeSeries(currency, range) {
-        const { from, to } = rangeToDates(range);
-        const url = `https://api.exchangerate.host/timeseries?start_date=${dateStr(from)}&end_date=${dateStr(to)}&base=EUR&symbols=${currency}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`exchangerate.host error: ${res.status}`);
-        const data = await res.json();
-        if (!data.success && !data.rates) throw new Error('exchangerate.host no data');
-        const points = Object.entries(data.rates).map(([date, rates]) => ({ date, value: rates[currency] }));
-        points.sort((a, b) => a.date.localeCompare(b.date));
-        return { points, source: 'Live data via exchangerate.host' };
-    }
-
-    async function exchangerateHostLatest(currency) {
-        const url = `https://api.exchangerate.host/latest?base=EUR&symbols=${currency}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`exchangerate.host error: ${res.status}`);
-        const data = await res.json();
-        if (!data.rates || !data.rates[currency]) throw new Error('exchangerate.host no data');
-        return { date: data.date, value: data.rates[currency], source: 'exchangerate.host' };
-    }
-
-    // ── Fallback: Generated realistic FX data ────────────────
-    const BASE_RATES = { GBP: 0.8580, CNY: 7.7800 };
-
-    function generateFXHistory(currentRate, range) {
-        const { from, to } = rangeToDates(range);
-        const days = Math.round((to - from) / 86400000);
-        let seed = Math.round(currentRate * 10000);
-        function rand() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
-        const step = days <= 60 ? 1 : (days <= 400 ? 1 : 7);
-        const totalSteps = Math.ceil(days / step);
-        const vol = currentRate * 0.001;
-        let rate = currentRate;
-        const ratesArr = [rate];
-        for (let i = 1; i <= totalSteps; i++) { rate = rate - (rand() - 0.5) * vol * 2; ratesArr.unshift(rate); }
-        const points = [];
-        for (let i = 0; i <= totalSteps; i++) {
-            const d = new Date(from); d.setDate(d.getDate() + i * step);
-            if (d > to) break;
-            if (d.getDay() === 0 || d.getDay() === 6) continue;
-            points.push({ date: dateStr(d), value: Math.round(ratesArr[i] * 10000) / 10000 });
-        }
-        return points;
-    }
-
-    // ── Fetch with fallback chain ────────────────────────────
-    async function fetchFXTimeSeries(currency, range) {
-        const providers = [
-            () => frankfurterTimeSeries(currency, range),
-            () => frankfurterDevTimeSeries(currency, range),
-            () => exchangerateHostTimeSeries(currency, range),
+        // Try both domains
+        const urls = [
+            `https://api.frankfurter.app/${from}..${to}?from=EUR&to=${currency}`,
+            `https://api.frankfurter.dev/${from}..${to}?from=EUR&to=${currency}`,
         ];
-        for (const provider of providers) {
+
+        let lastErr;
+        for (const url of urls) {
             try {
-                const result = await provider();
-                if (result.points && result.points.length > 0) return result;
-            } catch (e) { console.warn('FX provider failed:', e.message); }
+                const res = await fetchWithTimeout(url);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const json = await res.json();
+                if (!json.rates) throw new Error('No rates in response');
+                const pts = Object.entries(json.rates)
+                    .map(([d, r]) => ({ date: d, value: r[currency] }))
+                    .filter(p => p.value != null)
+                    .sort((a, b) => a.date.localeCompare(b.date));
+                if (pts.length === 0) throw new Error('Empty data');
+                return { points: pts, source: 'Live ECB data via Frankfurter API', live: true };
+            } catch (e) {
+                lastErr = e;
+                console.warn('FX fetch failed (' + url.split('/')[2] + '):', e.message);
+            }
         }
-        console.warn('All live FX APIs failed for', currency, '- using generated data');
-        const base = BASE_RATES[currency] || 1;
-        return { points: generateFXHistory(base, range), source: 'Estimated data (APIs unavailable)' };
+        throw lastErr || new Error('All FX endpoints failed');
     }
 
     async function fetchLatestFX(currency) {
-        const providers = [
-            () => frankfurterLatest(currency),
-            () => frankfurterDevLatest(currency),
-            () => exchangerateHostLatest(currency),
+        const urls = [
+            `https://api.frankfurter.app/latest?from=EUR&to=${currency}`,
+            `https://api.frankfurter.dev/latest?from=EUR&to=${currency}`,
         ];
-        for (const provider of providers) {
-            try { return await provider(); } catch (e) { console.warn('FX latest failed:', e.message); }
+        for (const url of urls) {
+            try {
+                const res = await fetchWithTimeout(url);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const json = await res.json();
+                if (!json.rates || !json.rates[currency]) throw new Error('No rate');
+                return { value: json.rates[currency], date: json.date, live: true };
+            } catch (e) { console.warn('Latest FX failed:', e.message); }
         }
-        const base = BASE_RATES[currency] || 1;
-        return { date: dateStr(new Date()), value: base, source: 'fallback' };
+        throw new Error('Could not fetch latest ' + currency);
     }
 
-    // ── Freight Container Prices ─────────────────────────────
-    function generateFreightData(range) {
-        const { from, to } = rangeToDates(range);
-        const days = Math.round((to - from) / 86400000);
+    // ═══════════════════════════════════════════════════════
+    // FREIGHT DATA (generated - no free public API exists)
+    // ═══════════════════════════════════════════════════════
+    function freightData(range) {
+        const days = RANGE_DAYS[range] || 30;
+        const from = ago(days), to = new Date();
         let seed = 42;
         function rand() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
-        const basePrice = 2200;
-        const step = days <= 30 ? 1 : (days <= 365 ? 1 : 7);
-        const totalSteps = Math.ceil(days / step);
-        const startPrice = range === '5Y' ? 1400 : range === '1Y' ? 1900 : range === '6M' ? 2050 : basePrice - 80;
-        let price = startPrice;
-        const points = [];
-        for (let i = 0; i <= totalSteps; i++) {
+        const step = days <= 30 ? 1 : days <= 365 ? 1 : 7;
+        const total = Math.ceil(days / step);
+        const start = range === '5Y' ? 1400 : range === '1Y' ? 1900 : range === '6M' ? 2050 : 2120;
+        let price = start;
+        const pts = [];
+        for (let i = 0; i <= total; i++) {
             const d = new Date(from); d.setDate(d.getDate() + i * step);
             if (d > to) break;
-            const month = d.getMonth();
-            const seasonal = Math.sin((month - 2) * Math.PI / 6) * 150;
-            const trend = (basePrice - price) * 0.003;
-            const noise = (rand() - 0.48) * 60;
+            const m = d.getMonth(), y = d.getFullYear();
+            const seasonal = Math.sin((m - 2) * Math.PI / 6) * 150;
+            price = Math.max(800, price + (2200 - price) * 0.003 + (rand() - 0.48) * 60);
             let spike = 0;
-            const year = d.getFullYear();
-            if (year === 2021) spike = 3500 * Math.sin((month + 1) * Math.PI / 12);
-            if (year === 2022 && month < 9) spike = 4000 * Math.max(0, 1 - month / 9);
-            price = Math.max(800, price + trend + noise);
-            points.push({ date: dateStr(d), value: Math.max(600, Math.round(price + seasonal + spike)) });
+            if (y === 2021) spike = 3500 * Math.sin((m + 1) * Math.PI / 12);
+            if (y === 2022 && m < 9) spike = 4000 * Math.max(0, 1 - m / 9);
+            pts.push({ date: fmt(d), value: Math.max(600, Math.round(price + seasonal + spike)) });
         }
-        return points;
+        return pts;
     }
 
-    async function fetchFreightTimeSeries(range) {
-        return { points: generateFreightData(range), source: 'Modelled on Freightos Baltic Index (FBX)' };
-    }
+    // ═══════════════════════════════════════════════════════
+    // CHARTS (category axis - no adapter needed)
+    // ═══════════════════════════════════════════════════════
+    const charts = {};
 
-    function getLatestFreight() {
-        const data = generateFreightData('30D');
-        return data[data.length - 1];
-    }
+    function makeChart(canvasId, labels, values, color, isFX) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
 
-    return { fetchFXTimeSeries, fetchLatestFX, fetchFreightTimeSeries, getLatestFreight };
-})();
+        // Thin out labels for readability
+        const maxLabels = 12;
+        const skipEvery = Math.max(1, Math.floor(labels.length / maxLabels));
+        const displayLabels = labels.map((l, i) => i % skipEvery === 0 ? formatLabel(l) : '');
 
-// ═══════════════════════════════════════════════════════════
-// CHART MODULE
-// ═══════════════════════════════════════════════════════════
+        const data = {
+            labels: labels,
+            datasets: [{
+                data: values,
+                borderColor: color,
+                backgroundColor: color + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 2.5,
+                pointRadius: 0,
+                pointHoverRadius: 5,
+            }]
+        };
 
-const Charts = (() => {
-    const instances = {};
-
-    function chartOptions(label, isCurrency, symbol) {
-        return {
-            responsive: true, maintainAspectRatio: false,
+        const opts = {
+            responsive: true,
+            maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(15,25,35,0.95)', titleColor: '#e8edf2', bodyColor: '#e8edf2',
-                    borderColor: '#2a4a6b', borderWidth: 1, padding: 12, displayColors: false,
+                    backgroundColor: 'rgba(15,25,35,0.95)',
+                    titleColor: '#e8edf2',
+                    bodyColor: '#e8edf2',
+                    borderColor: '#2a4a6b',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
                     callbacks: {
-                        title(items) {
-                            if (!items.length) return '';
-                            const d = new Date(items[0].parsed.x);
-                            return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-                        },
+                        title(items) { return items[0] ? items[0].label : ''; },
                         label(item) {
-                            return isCurrency ? `${label}: ${item.parsed.y.toFixed(4)}` : `${label}: ${symbol}${item.parsed.y.toLocaleString()}`;
+                            return isFX
+                                ? 'Rate: ' + item.parsed.y.toFixed(4)
+                                : 'Price: $' + item.parsed.y.toLocaleString();
                         }
                     }
                 }
             },
             scales: {
                 x: {
-                    type: 'time',
-                    time: { tooltipFormat: 'DD MMM yyyy', displayFormats: { day: 'dd MMM', week: 'dd MMM', month: 'MMM yyyy', year: 'yyyy' } },
-                    grid: { color: 'rgba(42,74,107,0.3)', drawBorder: false },
-                    ticks: { color: '#8899aa', font: { size: 11 }, maxTicksLimit: 10 }
+                    grid: { color: 'rgba(42,74,107,0.3)' },
+                    ticks: {
+                        color: '#8899aa',
+                        font: { size: 11 },
+                        maxRotation: 45,
+                        callback(val, i) { return displayLabels[i] || ''; }
+                    }
                 },
                 y: {
-                    grid: { color: 'rgba(42,74,107,0.3)', drawBorder: false },
-                    ticks: { color: '#8899aa', font: { size: 11 }, callback(v) { return isCurrency ? v.toFixed(4) : '$' + v.toLocaleString(); } }
+                    grid: { color: 'rgba(42,74,107,0.3)' },
+                    ticks: {
+                        color: '#8899aa',
+                        font: { size: 11 },
+                        callback(v) { return isFX ? v.toFixed(4) : '$' + v.toLocaleString(); }
+                    }
                 }
-            },
-            elements: { point: { radius: 0, hoverRadius: 5, hoverBorderWidth: 2 }, line: { tension: 0.3, borderWidth: 2.5 } }
+            }
         };
-    }
 
-    function showLoading(id) {
-        const c = document.getElementById(id).parentElement;
-        let o = c.querySelector('.chart-loading');
-        if (!o) { o = document.createElement('div'); o.className = 'chart-loading'; o.innerHTML = '<div class="spinner"></div>'; c.style.position = 'relative'; c.appendChild(o); }
-        o.style.display = 'flex';
-    }
-
-    function hideLoading(id) {
-        const o = document.getElementById(id).parentElement.querySelector('.chart-loading');
-        if (o) o.style.display = 'none';
-    }
-
-    function hexToRgba(hex, a) { const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16); return `rgba(${r},${g},${b},${a})`; }
-
-    function createOrUpdate(id, dataPoints, label, color, isCurrency, symbol = '$') {
-        const ctx = document.getElementById(id).getContext('2d');
-        const chartData = {
-            datasets: [{ label, data: dataPoints.map(p => ({ x: new Date(p.date), y: p.value })), borderColor: color, backgroundColor: hexToRgba(color, 0.08), fill: true }]
-        };
-        if (instances[id]) {
-            instances[id].data = chartData;
-            instances[id].update('none');
+        if (charts[canvasId]) {
+            charts[canvasId].data = data;
+            charts[canvasId].options.scales.x.ticks.callback = opts.scales.x.ticks.callback;
+            charts[canvasId].update('none');
         } else {
-            instances[id] = new Chart(ctx, { type: 'line', data: chartData, options: chartOptions(label, isCurrency, symbol) });
+            charts[canvasId] = new Chart(ctx, { type: 'line', data, options: opts });
         }
-        hideLoading(id);
     }
 
-    return { createOrUpdate, showLoading, hideLoading };
-})();
+    function formatLabel(dateStr) {
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+    }
 
-// ═══════════════════════════════════════════════════════════
-// APP
-// ═══════════════════════════════════════════════════════════
+    function showLoader(key, show) {
+        const box = document.getElementById('box-' + key);
+        let el = box.querySelector('.loading');
+        if (show) {
+            if (!el) { el = document.createElement('div'); el.className = 'loading'; el.innerHTML = '<div></div>'; box.appendChild(el); }
+            el.style.display = 'flex';
+        } else if (el) { el.style.display = 'none'; }
+    }
 
-(() => {
+    // ═══════════════════════════════════════════════════════
+    // APP
+    // ═══════════════════════════════════════════════════════
     const state = { eurgbp: '30D', eurcny: '30D', freight: '30D' };
     const COLORS = { eurgbp: '#4fc3f7', eurcny: '#ffb74d', freight: '#81c784' };
+    let apiWorking = false;
 
     async function loadChart(key) {
-        const canvasId = 'chart-' + key;
-        Charts.showLoading(canvasId);
-        try {
-            let result, label, isCurrency, symbol;
-            if (key === 'eurgbp') { result = await API.fetchFXTimeSeries('GBP', state.eurgbp); label = 'EUR/GBP'; isCurrency = true; }
-            else if (key === 'eurcny') { result = await API.fetchFXTimeSeries('CNY', state.eurcny); label = 'EUR/CNY'; isCurrency = true; }
-            else { result = await API.fetchFreightTimeSeries(state.freight); label = 'FBX Index'; isCurrency = false; symbol = '$'; }
+        showLoader(key, true);
+        const cvId = 'cv-' + key;
+        const srcEl = document.getElementById('src-' + key);
 
-            Charts.createOrUpdate(canvasId, result.points, label, COLORS[key], isCurrency, symbol);
-            const srcEl = document.getElementById('source-' + key);
-            if (srcEl && result.source) srcEl.textContent = result.source;
+        try {
+            let result;
+            if (key === 'freight') {
+                const pts = freightData(state.freight);
+                result = { points: pts, source: 'Modelled on Freightos Baltic Index (FBX)' };
+            } else {
+                const curr = key === 'eurgbp' ? 'GBP' : 'CNY';
+                result = await fetchFX(curr, state[key]);
+                apiWorking = true;
+            }
+
+            const labels = result.points.map(p => p.date);
+            const values = result.points.map(p => p.value);
+            const isFX = key !== 'freight';
+
+            makeChart(cvId, labels, values, COLORS[key], isFX);
+            if (srcEl) srcEl.textContent = result.source || '';
         } catch (err) {
-            console.error('Failed to load ' + key + ':', err);
-            Charts.hideLoading(canvasId);
-            showError('Failed to load ' + key + ' data');
+            console.error('Chart ' + key + ' error:', err);
+            if (srcEl) srcEl.textContent = 'Error: ' + err.message;
+            srcEl.style.color = '#ef5350';
+        }
+        showLoader(key, false);
+    }
+
+    async function loadCards() {
+        try {
+            const [gbp, cny] = await Promise.all([fetchLatestFX('GBP'), fetchLatestFX('CNY')]);
+            const fr = freightData('30D');
+            const frLatest = fr[fr.length - 1];
+
+            setCard('eurgbp', gbp.value, 4, '');
+            setCard('eurcny', cny.value, 4, '');
+            setCard('freight', frLatest.value, 0, '$');
+
+            const now = new Date().toLocaleTimeString('en-GB');
+            document.getElementById('last-updated').textContent = 'Live \u2022 Updated ' + now;
+            setStatus('Connected to live ECB exchange rate feed \u2022 Updated ' + now, 'success');
+        } catch (err) {
+            console.error('Cards error:', err);
+            setStatus('Warning: Could not fetch live rates - ' + err.message + '. Check browser console (F12).', 'error');
         }
     }
 
-    async function loadRateCards() {
-        try {
-            const [gbp, cny] = await Promise.all([API.fetchLatestFX('GBP'), API.fetchLatestFX('CNY')]);
-            const freight = API.getLatestFreight();
-            updateCard('eurgbp', gbp.value, 4, '', '');
-            updateCard('eurcny', cny.value, 4, '', '');
-            updateCard('freight', freight.value, 0, '$', '/FEU');
-            document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB');
-        } catch (err) { console.error('Rate cards error:', err); }
-    }
-
-    function updateCard(key, value, dec, prefix, suffix) {
-        const el = document.getElementById('rate-' + key);
-        const chEl = document.getElementById('change-' + key);
-        const prev = el.dataset.prev ? parseFloat(el.dataset.prev) : null;
-        el.textContent = prefix + value.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + suffix;
-        el.dataset.prev = value;
-        if (prev !== null) {
+    function setCard(key, value, dec, prefix) {
+        const el = document.getElementById('rv-' + key);
+        const ch = document.getElementById('rc-' + key);
+        const prev = el.dataset.v ? parseFloat(el.dataset.v) : null;
+        el.textContent = prefix + value.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        el.dataset.v = value;
+        if (prev !== null && prev !== value) {
             const diff = value - prev;
             const pct = ((diff / prev) * 100).toFixed(2);
             const s = diff >= 0 ? '+' : '';
-            chEl.textContent = s + diff.toFixed(dec) + ' (' + s + pct + '%)';
-            chEl.className = 'rate-change ' + (diff >= 0 ? 'positive' : 'negative');
+            ch.textContent = s + diff.toFixed(dec) + ' (' + s + pct + '%)';
+            ch.className = 'rate-change ' + (diff >= 0 ? 'up' : 'down');
         }
     }
 
-    function showError(msg) {
-        const existing = document.querySelector('.error-toast');
-        if (existing) existing.remove();
-        const t = document.createElement('div'); t.className = 'error-toast'; t.textContent = msg;
-        document.body.appendChild(t); setTimeout(() => t.remove(), 5000);
-    }
-
-    function setupButtons() {
-        document.querySelectorAll('.time-range-selector').forEach(sel => {
-            const key = sel.dataset.chart;
-            sel.querySelectorAll('.range-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    sel.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    state[key] = btn.dataset.range;
-                    loadChart(key);
-                });
+    // Range buttons
+    document.querySelectorAll('.range-bar').forEach(bar => {
+        const key = bar.dataset.key;
+        bar.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                bar.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+                btn.classList.add('on');
+                state[key] = btn.dataset.r;
+                loadChart(key);
             });
         });
+    });
+
+    // Boot
+    async function boot() {
+        try {
+            setStatus('Fetching live exchange rates from ECB...', '');
+            await Promise.all([loadCards(), loadChart('eurgbp'), loadChart('eurcny'), loadChart('freight')]);
+            if (!apiWorking) {
+                setStatus('FX APIs could not be reached. Please check your internet connection or try refreshing.', 'error');
+            }
+        } catch (e) {
+            setStatus('Startup error: ' + e.message, 'error');
+        }
+        // Auto refresh every 60s
+        setInterval(() => { loadCards(); loadChart('eurgbp'); loadChart('eurcny'); loadChart('freight'); }, 60000);
     }
 
-    async function init() {
-        setupButtons();
-        await Promise.all([loadRateCards(), loadChart('eurgbp'), loadChart('eurcny'), loadChart('freight')]);
-        setInterval(() => { loadRateCards(); loadChart('eurgbp'); loadChart('eurcny'); loadChart('freight'); }, 60000);
+    // Ensure Chart.js loaded
+    if (typeof Chart === 'undefined') {
+        setStatus('ERROR: Chart.js failed to load. Check your internet connection and refresh.', 'error');
+    } else {
+        boot();
     }
-
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
-})();
-</script>
+    </script>
 </body>
 </html>
