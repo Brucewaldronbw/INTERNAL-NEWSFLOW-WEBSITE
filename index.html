@@ -128,63 +128,160 @@
     const RANGE_DAYS = { '1D':1, '30D':30, '6M':183, '1Y':365, '5Y':1826 };
 
     // Fetch with timeout
-    function fetchWithTimeout(url, ms = 8000) {
+    function fetchWithTimeout(url, ms = 10000) {
         return Promise.race([
             fetch(url),
-            new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout')), ms))
+            new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout after ' + ms + 'ms')), ms))
         ]);
     }
 
+    // Track which API worked for status display
+    let fxApiSource = '';
+    const errors = [];
+
     // ═══════════════════════════════════════════════════════
-    // FX API: frankfurter.app (free, CORS enabled, ECB data)
+    // FX TIME SERIES — tries 4 providers in order
     // ═══════════════════════════════════════════════════════
+
+    // Provider 1: Frankfurter .app
+    async function fx_frankfurterApp(currency, from, to) {
+        const url = `https://api.frankfurter.app/${from}..${to}?from=EUR&to=${currency}`;
+        const res = await fetchWithTimeout(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        if (!json.rates) throw new Error('No rates');
+        const pts = Object.entries(json.rates).map(([d, r]) => ({ date: d, value: r[currency] })).filter(p => p.value != null);
+        if (!pts.length) throw new Error('Empty');
+        pts.sort((a, b) => a.date.localeCompare(b.date));
+        return { points: pts, source: 'Live ECB data via frankfurter.app' };
+    }
+
+    // Provider 2: Frankfurter .dev
+    async function fx_frankfurterDev(currency, from, to) {
+        const url = `https://api.frankfurter.dev/${from}..${to}?from=EUR&to=${currency}`;
+        const res = await fetchWithTimeout(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        if (!json.rates) throw new Error('No rates');
+        const pts = Object.entries(json.rates).map(([d, r]) => ({ date: d, value: r[currency] })).filter(p => p.value != null);
+        if (!pts.length) throw new Error('Empty');
+        pts.sort((a, b) => a.date.localeCompare(b.date));
+        return { points: pts, source: 'Live ECB data via frankfurter.dev' };
+    }
+
+    // Provider 3: VATComply (ECB data, supports date ranges)
+    async function fx_vatcomply(currency, from, to) {
+        // VATComply only supports single date queries, so we sample dates
+        const fromD = new Date(from), toD = new Date(to);
+        const days = Math.round((toD - fromD) / 86400000);
+        const step = Math.max(1, Math.floor(days / 60)); // max ~60 requests
+        const dates = [];
+        for (let d = new Date(fromD); d <= toD; d.setDate(d.getDate() + step)) {
+            dates.push(fmt(new Date(d)));
+        }
+        // Fetch in batches of 10
+        const pts = [];
+        for (let i = 0; i < dates.length; i += 10) {
+            const batch = dates.slice(i, i + 10);
+            const results = await Promise.all(batch.map(async dt => {
+                try {
+                    const res = await fetchWithTimeout(`https://api.vatcomply.com/rates?base=EUR&date=${dt}`, 6000);
+                    if (!res.ok) return null;
+                    const json = await res.json();
+                    if (json.rates && json.rates[currency]) return { date: dt, value: json.rates[currency] };
+                } catch (e) { return null; }
+                return null;
+            }));
+            results.filter(Boolean).forEach(p => pts.push(p));
+        }
+        if (pts.length < 3) throw new Error('Too few data points from VATComply');
+        pts.sort((a, b) => a.date.localeCompare(b.date));
+        return { points: pts, source: 'Live ECB data via VATComply API' };
+    }
+
+    // Provider 4: Open ExchangeRate API (latest only, build chart from repeated fetches is not practical)
+    // Used only for latest rate cards, not time series
+
     async function fetchFX(currency, range) {
         const days = RANGE_DAYS[range] || 30;
         const from = fmt(ago(days));
         const to = fmt(new Date());
 
-        // Try both domains
-        const urls = [
-            `https://api.frankfurter.app/${from}..${to}?from=EUR&to=${currency}`,
-            `https://api.frankfurter.dev/${from}..${to}?from=EUR&to=${currency}`,
+        const providers = [
+            { name: 'frankfurter.app', fn: () => fx_frankfurterApp(currency, from, to) },
+            { name: 'frankfurter.dev', fn: () => fx_frankfurterDev(currency, from, to) },
+            { name: 'vatcomply.com', fn: () => fx_vatcomply(currency, from, to) },
         ];
 
-        let lastErr;
-        for (const url of urls) {
+        for (const p of providers) {
             try {
-                const res = await fetchWithTimeout(url);
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                const json = await res.json();
-                if (!json.rates) throw new Error('No rates in response');
-                const pts = Object.entries(json.rates)
-                    .map(([d, r]) => ({ date: d, value: r[currency] }))
-                    .filter(p => p.value != null)
-                    .sort((a, b) => a.date.localeCompare(b.date));
-                if (pts.length === 0) throw new Error('Empty data');
-                return { points: pts, source: 'Live ECB data via Frankfurter API', live: true };
+                setStatus(`Trying ${p.name} for ${currency} data...`, '');
+                const result = await p.fn();
+                fxApiSource = p.name;
+                return result;
             } catch (e) {
-                lastErr = e;
-                console.warn('FX fetch failed (' + url.split('/')[2] + '):', e.message);
+                const msg = `${p.name}: ${e.message}`;
+                errors.push(msg);
+                console.warn('FX provider failed -', msg);
             }
         }
-        throw lastErr || new Error('All FX endpoints failed');
+        throw new Error('All FX APIs failed for ' + currency + '. Tried: ' + errors.join(', '));
     }
 
+    // ═══════════════════════════════════════════════════════
+    // FX LATEST RATE — tries 5 providers
+    // ═══════════════════════════════════════════════════════
     async function fetchLatestFX(currency) {
-        const urls = [
-            `https://api.frankfurter.app/latest?from=EUR&to=${currency}`,
-            `https://api.frankfurter.dev/latest?from=EUR&to=${currency}`,
-        ];
-        for (const url of urls) {
-            try {
-                const res = await fetchWithTimeout(url);
+        const curr = currency.toLowerCase();
+        const providers = [
+            { name: 'frankfurter.app', fn: async () => {
+                const res = await fetchWithTimeout(`https://api.frankfurter.app/latest?from=EUR&to=${currency}`);
                 if (!res.ok) throw new Error('HTTP ' + res.status);
-                const json = await res.json();
-                if (!json.rates || !json.rates[currency]) throw new Error('No rate');
-                return { value: json.rates[currency], date: json.date, live: true };
-            } catch (e) { console.warn('Latest FX failed:', e.message); }
+                const j = await res.json(); if (!j.rates?.[currency]) throw new Error('No rate');
+                return { value: j.rates[currency], date: j.date };
+            }},
+            { name: 'frankfurter.dev', fn: async () => {
+                const res = await fetchWithTimeout(`https://api.frankfurter.dev/latest?from=EUR&to=${currency}`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const j = await res.json(); if (!j.rates?.[currency]) throw new Error('No rate');
+                return { value: j.rates[currency], date: j.date };
+            }},
+            { name: 'vatcomply.com', fn: async () => {
+                const res = await fetchWithTimeout(`https://api.vatcomply.com/rates?base=EUR`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const j = await res.json(); if (!j.rates?.[currency]) throw new Error('No rate');
+                return { value: j.rates[currency], date: j.date };
+            }},
+            { name: 'open.er-api.com', fn: async () => {
+                const res = await fetchWithTimeout(`https://open.er-api.com/v6/latest/EUR`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const j = await res.json(); if (!j.rates?.[currency]) throw new Error('No rate');
+                return { value: j.rates[currency], date: fmt(new Date()) };
+            }},
+            { name: 'exchangerate-api.com', fn: async () => {
+                const res = await fetchWithTimeout(`https://api.exchangerate-api.com/v4/latest/EUR`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const j = await res.json(); if (!j.rates?.[currency]) throw new Error('No rate');
+                return { value: j.rates[currency], date: fmt(new Date()) };
+            }},
+            { name: 'jsdelivr CDN', fn: async () => {
+                const res = await fetchWithTimeout(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const j = await res.json(); if (!j.eur?.[curr]) throw new Error('No rate');
+                return { value: j.eur[curr], date: j.date || fmt(new Date()) };
+            }},
+        ];
+
+        for (const p of providers) {
+            try {
+                const result = await p.fn();
+                fxApiSource = fxApiSource || p.name;
+                return result;
+            } catch (e) {
+                console.warn('Latest FX ' + p.name + ':', e.message);
+            }
         }
-        throw new Error('Could not fetch latest ' + currency);
+        throw new Error('All providers failed for latest ' + currency);
     }
 
     // ═══════════════════════════════════════════════════════
@@ -356,9 +453,9 @@
             setCard('eurcny', cny.value, 4, '');
             setCard('freight', frLatest.value, 0, '$');
 
+            apiWorking = true;
             const now = new Date().toLocaleTimeString('en-GB');
-            document.getElementById('last-updated').textContent = 'Live \u2022 Updated ' + now;
-            setStatus('Connected to live ECB exchange rate feed \u2022 Updated ' + now, 'success');
+            document.getElementById('last-updated').textContent = 'Live via ' + (fxApiSource || 'API') + ' \u2022 Updated ' + now;
         } catch (err) {
             console.error('Cards error:', err);
             setStatus('Warning: Could not fetch live rates - ' + err.message + '. Check browser console (F12).', 'error');
@@ -396,13 +493,19 @@
     // Boot
     async function boot() {
         try {
-            setStatus('Fetching live exchange rates from ECB...', '');
-            await Promise.all([loadCards(), loadChart('eurgbp'), loadChart('eurcny'), loadChart('freight')]);
-            if (!apiWorking) {
-                setStatus('FX APIs could not be reached. Please check your internet connection or try refreshing.', 'error');
+            setStatus('Connecting to live exchange rate feeds (trying multiple providers)...', '');
+            // Load cards first so we know if ANY API works
+            await loadCards();
+            // Then load charts
+            await Promise.all([loadChart('eurgbp'), loadChart('eurcny'), loadChart('freight')]);
+            if (apiWorking) {
+                const now = new Date().toLocaleTimeString('en-GB');
+                setStatus('Connected to live FX feed via ' + fxApiSource + ' \u2022 Updated ' + now, 'success');
+            } else if (errors.length > 0) {
+                setStatus('FX APIs failed: ' + errors.join(' | ') + ' \u2014 Check internet or try refreshing.', 'error');
             }
         } catch (e) {
-            setStatus('Startup error: ' + e.message, 'error');
+            setStatus('Startup error: ' + e.message + (errors.length ? ' | Tried: ' + errors.join(', ') : ''), 'error');
         }
         // Auto refresh every 60s
         setInterval(() => { loadCards(); loadChart('eurgbp'); loadChart('eurcny'); loadChart('freight'); }, 60000);
