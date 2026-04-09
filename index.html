@@ -33,6 +33,11 @@
         .range-bar button { background: transparent; border: none; color: #8899aa; padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
         .range-bar button:hover { color: #e8edf2; background: rgba(79,195,247,0.1); }
         .range-bar button.on { background: #4fc3f7; color: #0f1923; }
+        .email-btn { background: #4fc3f7; color: #0f1923; border: none; padding: 0.5rem 1.2rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.4rem; }
+        .email-btn:hover { background: #81d4fa; }
+        .email-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .email-btn svg { width: 16px; height: 16px; }
+        .email-sent { background: #1a2733; border: 1px solid #66bb6a; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #66bb6a; display: none; }
         .chart-box { position: relative; height: 350px; }
         .chart-box .loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(30,48,68,0.85); border-radius: 8px; z-index: 10; }
         .chart-box .loading div { width: 32px; height: 32px; border: 3px solid #2a4a6b; border-top-color: #4fc3f7; border-radius: 50%; animation: spin 0.8s linear infinite; }
@@ -51,10 +56,17 @@
     <header>
         <div class="header-content">
             <h1>FX &amp; Freight Dashboard</h1>
-            <div class="live-indicator"><span class="pulse"></span><span id="last-updated">Loading...</span></div>
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <button class="email-btn" id="email-btn" onclick="sendEmailReport()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 4L12 13 2 4"/></svg>
+                    Email Report
+                </button>
+                <div class="live-indicator"><span class="pulse"></span><span id="last-updated">Loading...</span></div>
+            </div>
         </div>
     </header>
     <main>
+        <div class="email-sent" id="email-sent"></div>
         <div id="status-bar">Connecting to live data feeds...</div>
         <section class="rate-cards">
             <div class="rate-card"><div class="rate-label">EUR / GBP</div><div class="rate-value" id="rv-eurgbp">--</div><div class="rate-change" id="rc-eurgbp"></div></div>
@@ -94,8 +106,8 @@
     </main>
     <footer>FX rates from ECB via Frankfurter API &bull; Auto-refreshes every 60 seconds</footer>
 
-    <!-- Only one external dependency: Chart.js (no adapters needed) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
     <script>
     // ═══════════════════════════════════════════════════════
@@ -394,6 +406,128 @@
         }
         // Auto refresh every 60s
         setInterval(() => { loadCards(); loadChart('eurgbp'); loadChart('eurcny'); loadChart('freight'); }, 60000);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // EMAIL REPORT via EmailJS
+    // ═══════════════════════════════════════════════════════
+    //
+    // FREE SETUP (one-time, ~3 minutes):
+    // 1. Go to https://www.emailjs.com/ and create a free account
+    // 2. Add an Email Service (e.g. Gmail) — note the Service ID
+    // 3. Create an Email Template with these variables:
+    //      Subject: {{subject}}
+    //      To: {{to_email}}
+    //      Body (HTML): {{{report_html}}}
+    //    Note the Template ID
+    // 4. Go to Account > API Keys — note your Public Key
+    // 5. Fill in the 3 values below:
+    //
+    const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';      // <-- paste your public key
+    const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';      // <-- paste your service ID
+    const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';    // <-- paste your template ID
+    const REPORT_EMAIL = 'bruce.waldron@moyneroberts.com';
+
+    // Initialise EmailJS
+    if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY') {
+        emailjs.init(EMAILJS_PUBLIC_KEY);
+    }
+
+    function buildReportHTML() {
+        const now = new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' });
+        const eurgbp = document.getElementById('rv-eurgbp').textContent;
+        const eurcny = document.getElementById('rv-eurcny').textContent;
+        const freight = document.getElementById('rv-freight').textContent;
+        const chgGbp = document.getElementById('rc-eurgbp').textContent || 'N/A';
+        const chgCny = document.getElementById('rc-eurcny').textContent || 'N/A';
+        const chgFrt = document.getElementById('rc-freight').textContent || 'N/A';
+
+        return `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8f9fa;padding:24px;border-radius:12px;">
+                <h1 style="color:#1a2733;font-size:22px;margin-bottom:4px;">FX &amp; Freight Dashboard Report</h1>
+                <p style="color:#8899aa;font-size:13px;margin-bottom:20px;">${now}</p>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+                    <tr style="background:#1a2733;color:#e8edf2;">
+                        <th style="padding:12px 16px;text-align:left;border-radius:8px 0 0 0;">Pair</th>
+                        <th style="padding:12px 16px;text-align:right;">Rate</th>
+                        <th style="padding:12px 16px;text-align:right;border-radius:0 8px 0 0;">Change</th>
+                    </tr>
+                    <tr style="background:white;">
+                        <td style="padding:12px 16px;border-bottom:1px solid #eee;font-weight:600;">EUR / GBP</td>
+                        <td style="padding:12px 16px;border-bottom:1px solid #eee;text-align:right;font-size:18px;font-weight:700;">${eurgbp}</td>
+                        <td style="padding:12px 16px;border-bottom:1px solid #eee;text-align:right;font-size:13px;">${chgGbp}</td>
+                    </tr>
+                    <tr style="background:#f8f9fa;">
+                        <td style="padding:12px 16px;border-bottom:1px solid #eee;font-weight:600;">EUR / CNY</td>
+                        <td style="padding:12px 16px;border-bottom:1px solid #eee;text-align:right;font-size:18px;font-weight:700;">${eurcny}</td>
+                        <td style="padding:12px 16px;border-bottom:1px solid #eee;text-align:right;font-size:13px;">${chgCny}</td>
+                    </tr>
+                    <tr style="background:white;">
+                        <td style="padding:12px 16px;font-weight:600;">Container Freight (FBX)</td>
+                        <td style="padding:12px 16px;text-align:right;font-size:18px;font-weight:700;">${freight}</td>
+                        <td style="padding:12px 16px;text-align:right;font-size:13px;">${chgFrt}</td>
+                    </tr>
+                </table>
+                <p style="color:#8899aa;font-size:12px;">FX data sourced from ECB via Frankfurter API. Auto-generated by FX &amp; Freight Dashboard.</p>
+            </div>`;
+    }
+
+    function sendEmailReport() {
+        const btn = document.getElementById('email-btn');
+        const banner = document.getElementById('email-sent');
+
+        // If EmailJS not configured, fall back to mailto
+        if (typeof emailjs === 'undefined' || EMAILJS_PUBLIC_KEY === 'YOUR_PUBLIC_KEY') {
+            // mailto fallback
+            const now = new Date().toLocaleString('en-GB');
+            const eurgbp = document.getElementById('rv-eurgbp').textContent;
+            const eurcny = document.getElementById('rv-eurcny').textContent;
+            const freight = document.getElementById('rv-freight').textContent;
+            const body = `FX & Freight Dashboard Report - ${now}%0D%0A%0D%0A`
+                + `EUR/GBP: ${eurgbp}%0D%0A`
+                + `EUR/CNY: ${eurcny}%0D%0A`
+                + `Container Freight (FBX): ${freight}%0D%0A%0D%0A`
+                + `Source: ECB via Frankfurter API`;
+            const subject = encodeURIComponent('FX & Freight Report - ' + now);
+            window.open(`mailto:${REPORT_EMAIL}?subject=${subject}&body=${body}`, '_self');
+            banner.textContent = 'Email client opened with report. If nothing happened, check your pop-up blocker.';
+            banner.style.display = 'block';
+            setTimeout(() => banner.style.display = 'none', 8000);
+            return;
+        }
+
+        // Send via EmailJS
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+
+        const params = {
+            to_email: REPORT_EMAIL,
+            subject: 'FX & Freight Report - ' + new Date().toLocaleString('en-GB'),
+            report_html: buildReportHTML(),
+        };
+
+        emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params)
+            .then(() => {
+                btn.textContent = 'Sent!';
+                banner.textContent = 'Report emailed to ' + REPORT_EMAIL + ' successfully.';
+                banner.style.display = 'block';
+                banner.style.borderColor = '#66bb6a';
+                banner.style.color = '#66bb6a';
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 4L12 13 2 4"/></svg> Email Report';
+                    banner.style.display = 'none';
+                }, 5000);
+            })
+            .catch(err => {
+                console.error('EmailJS error:', err);
+                btn.textContent = 'Failed - retry?';
+                btn.disabled = false;
+                banner.textContent = 'Email failed: ' + (err.text || err.message || 'Unknown error') + '. Check EmailJS config.';
+                banner.style.display = 'block';
+                banner.style.borderColor = '#ef5350';
+                banner.style.color = '#ef5350';
+            });
     }
 
     // Ensure Chart.js loaded
