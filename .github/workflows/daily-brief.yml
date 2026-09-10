@@ -1,0 +1,116 @@
+name: Daily newsflow brief
+
+on:
+  schedule:
+    # 09:00 Europe/Dublin all year: 08:00 UTC in IST (summer), 09:00 UTC in GMT
+    # (winter). The 10:00 UTC run is a safety net for a skipped/late schedule.
+    # pipeline/run.py enforces "at or after 09:00 local, once per day", so the
+    # extra runs only refresh the website - they never send a second email.
+    - cron: "0 8 * * *"
+    - cron: "0 9 * * *"
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+    inputs:
+      force_send:
+        description: "Send the email now, ignoring the 09:00 local-time guard"
+        type: boolean
+        default: false
+      recipients:
+        description: "Override recipients (comma separated). Blank = the usual list."
+        type: string
+        default: ""
+
+concurrency:
+  group: daily-brief
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build dashboard and send the brief
+        id: brief
+        # Never let a delivery failure skip the dashboard refresh below - the
+        # job is still marked failed by the final step.
+        continue-on-error: true
+        env:
+          # delivery - set whichever transport you use as repository secrets
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+          GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+          GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_FROM_NAME: ${{ vars.MAIL_FROM_NAME }}
+          BRIEF_RECIPIENTS: ${{ vars.BRIEF_RECIPIENTS }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          python -m pipeline.run \
+            ${{ (github.event_name == 'workflow_dispatch' && inputs.force_send) && '--force' || '' }} \
+            ${{ (github.event_name == 'workflow_dispatch' && inputs.recipients != '') && format('--to "{0}"', inputs.recipients) || '' }}
+
+      - name: Commit refreshed dashboard and history
+        if: ${{ !cancelled() }}
+        run: |
+          git config user.name  "newsflow-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A index.html assets data
+          if git diff --cached --quiet; then
+            echo "nothing changed"
+            exit 0
+          fi
+          git commit -m "Daily newsflow refresh $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
+          for attempt in 1 2 3 4; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && \
+              git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            echo "push attempt ${attempt} failed; retrying"
+            sleep $((2 ** attempt))
+          done
+          echo "::error::could not push the refreshed dashboard"
+          exit 1
+
+      - name: Package the site for GitHub Pages
+        if: ${{ !cancelled() && vars.PAGES_VIA_ACTIONS == 'true' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Surface a delivery failure
+        if: steps.brief.outcome == 'failure'
+        run: |
+          echo "::error::The brief did not send. Check the 'Build dashboard and send the brief' step -"
+          echo "::error::exit 2 means no email transport is configured (set the repository secrets)."
+          exit 1
+
+  deploy-pages:
+    # Only needed when Pages is set to "GitHub Actions" as its source. With the
+    # simpler "Deploy from a branch" setting the commit above is enough and this
+    # job is skipped - see README.
+    if: vars.PAGES_VIA_ACTIONS == 'true'
+    needs: build-and-send
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

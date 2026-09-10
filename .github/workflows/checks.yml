@@ -1,0 +1,29 @@
+name: Checks
+
+on:
+  push:
+    branches-ignore: [gh-pages]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Pipeline runs with every source unavailable
+        run: python -m pipeline.run --offline --no-email --out "${RUNNER_TEMP}/site"
+      - name: Site and email render from sample data
+        run: python scripts/preview_with_sample_data.py "${RUNNER_TEMP}/preview"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview
+          path: ${{ runner.temp }}/preview
+          retention-days: 7
