@@ -9,9 +9,26 @@ A self-updating dashboard and a 09:00 (Europe/Dublin) email covering:
 | **China → Europe freight** | FBX11, FBX13, Drewry WCI lanes (Shanghai→Rotterdam / Genoa), WCI composite, SCFI, with history | Freightos FBX → Drewry WCI → SSE/SCFI |
 | **Tax & policy newsflow** | Ireland, UK, Netherlands, Belgium — business tax, reliefs, employment law, employment taxes | GOV.UK Atom feeds (HMRC, Treasury, DBT, DWP, Companies House, ONS) + site-scoped sweeps of revenue.ie, gov.ie, cso.ie, rijksoverheid.nl, belastingdienst.nl, finance.belgium.be and others + topical news sweeps |
 | **Fire safety M&A** | acquisitions, mergers and PE activity in fire safety / fire protection across the UK and Europe | targeted Google News sweeps |
-| **Leading & lagging indicators** | Brent, copper, Euro Stoxx 50, FTSE 100, EUR/USD; euro-area 10y yield, UK 10y gilt, Bank Rate; HICP inflation, unemployment and consumer confidence for IE/NL/BE/euro area; UK CPIH, unemployment, GDP and average weekly earnings | Yahoo Finance (Stooq fallback), ECB, Bank of England, Eurostat, ONS |
+| **Leading indicators** | EUR/USD, euro-area 3m / 2y / 10y yields and the 10y−2y curve slope, UK 10y gilt; Brent, copper, Euro Stoxx 50 and FTSE 100 where obtainable | ECB, Bank of England (Yahoo/Stooq best-effort) |
+| **Lagging indicators** | HICP inflation and unemployment for IE / NL / BE / euro area; UK CPIH, unemployment and GDP; Bank of England Bank Rate | Eurostat, ONS, Bank of England |
 
-Every source is free and needs no API key.
+Every source is free and needs no API key, and every one of them has been
+verified answering from a GitHub Actions runner — which is where this runs.
+
+Two caveats worth knowing up front:
+
+* **Yahoo Finance and Stooq refuse datacentre IP ranges**, which is what CI and
+  the scheduler run on. Brent, copper and the equity indices are therefore
+  best-effort: when they are refused they simply do not appear, and nothing else
+  is affected. Everything the brief depends on comes from the ECB, the Bank of
+  England, Eurostat, the ONS and GOV.UK, which all answer reliably.
+* **Freight rates have no free public API at all.** The collector scrapes
+  Drewry's weekly commentary (composite, Shanghai→Rotterdam, Shanghai→Genoa),
+  Freightos FBX and the SCFI. Drewry is currently the one that answers, and it
+  returns all three lanes. Because
+  each reading is appended to `data/freight_history.json`, the freight chart
+  builds up its history from the first successful run onwards rather than
+  arriving complete on day one.
 
 ---
 
