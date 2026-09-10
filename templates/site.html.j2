@@ -2,7 +2,7 @@
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Moyne Roberts — Daily Business Newsflow</title>
+<title>{{ site_title }}</title>
 <meta name="description" content="Daily FX, China–Europe freight, tax &amp; policy newsflow and economic indicators for Moyne Roberts.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
 <script src="assets/vendor/chart.umd.js" defer></script>
@@ -58,7 +58,8 @@ h2{font-size:13px;letter-spacing:1.1px;text-transform:uppercase;color:var(--mute
 .panel .sub{margin:0 0 14px;font-size:12.5px;color:var(--ink-2)}
 .chartbox{position:relative;height:290px}
 .chartbox.tall{height:330px}
-table.data{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+.tablewrap{overflow-x:auto;margin-top:14px;-webkit-overflow-scrolling:touch}
+table.data{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
 table.data th{text-align:left;color:var(--ink-2);font-weight:600;font-size:11.5px;letter-spacing:.4px;
   text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--grid)}
 table.data td{padding:9px 10px;border-bottom:1px solid var(--wash)}
@@ -79,79 +80,150 @@ table.data tr:last-child td{border-bottom:0}
 .warn a{color:inherit}
 footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--grid);font-size:12px;color:var(--muted);line-height:1.7}
 .pill{display:inline-block;font-size:11px;color:var(--ink-2);background:var(--wash);border-radius:999px;padding:3px 10px;margin:0 6px 6px 0}
-@media(max-width:640px){.chartbox{height:240px}.card .val{font-size:23px}}
+@media(max-width:640px){.chartbox{height:240px}.card .val{font-size:23px}
+  .panel{padding:15px 14px}.wrap{padding:0 14px 48px}
+  h2{margin:30px 0 12px}}
 </style>
 </head>
 <body>
 <header class="top"><div class="wrap">
   <div>
-    <h1>Moyne Roberts — Daily Business Newsflow</h1>
-    <p>Thursday 10 September 2026 &nbsp;·&nbsp; FX - Freight - Tax &amp; Policy - M&amp;A - Economic Indicators</p>
+    <h1>{{ site_title }}</h1>
+    <p>{{ date_long }} &nbsp;·&nbsp; {{ site_tagline }}</p>
   </div>
   <button class="themebtn" id="theme-toggle" type="button">Toggle theme</button>
 </div></header>
 
 <main class="wrap">
 
-<div class="notice warn" style="margin-top:22px">Some sources did not respond on this run: one or more FX sources, all freight indices, economic indicator feeds, news feeds. Everything else below is current; the collector retries automatically on the next run.</div>
+  {% if degraded %}<div class="notice warn" style="margin-top:22px">{{ degraded }}</div>{% endif %}
+
   <h2>At a glance</h2>
   <div class="cards">
+  {% for card in glance %}
     <div class="card">
-      <div class="lbl">EUR / CNY</div>
-      <div class="val">n/a</div>
-      <div class="chg flat">- n/a 1w</div>
-      <div class="note">no data yet</div>
+      <div class="lbl">{{ card.label }}</div>
+      <div class="val">{{ card.value }}</div>
+      <div class="chg {{ card.cls }}">{{ card.arrow }} {{ card.change }}</div>
+      <div class="note">{{ card.note }}</div>
     </div>
-    <div class="card">
-      <div class="lbl">EUR / GBP</div>
-      <div class="val">n/a</div>
-      <div class="chg flat">- n/a 1w</div>
-      <div class="note">no data yet</div>
-    </div>
-    <div class="card">
-      <div class="lbl">China → Europe freight</div>
-      <div class="val">—</div>
-      <div class="chg flat">- no reading</div>
-      <div class="note">index sources unavailable this run</div>
-    </div>
+  {% endfor %}
   </div>
 
+  {% if summary_lines %}
+  <h2>What moved</h2>
+  <div class="notice">
+    {% for line in summary_lines %}<div>• {{ line }}</div>{% endfor %}
+  </div>
+  {% endif %}
 
   <h2>Foreign exchange</h2>
+  {% for pair in fx.pairs %}
   <div class="panel">
-    <h3>EUR / CNY — n/a</h3>
-    <p class="sub">Chinese renminbi per euro - drives landed cost of China-sourced product.</p>
+    <h3>{{ pair.label }} — {{ pair.value_fmt }}</h3>
+    <p class="sub">{{ pair.blurb }}{% if pair.as_of %} · ECB reference rate, {{ pair.as_of }} · {{ pair.observations }} observations{% endif %}</p>
+    {% if pair.points %}
+      <div class="chartbox"><canvas id="chart-fx-{{ pair.key }}"></canvas></div>
+      <div class="tablewrap"><table class="data">
+        <tr><th>Window</th>{% for label, _ in pair.change_row %}<th class="num">{{ label }}</th>{% endfor %}<th class="num">52w low</th><th class="num">52w high</th></tr>
+        <tr><td>Change</td>
+          {% for _, value in pair.change_row %}<td class="num {{ value.cls }}">{{ value.text }}</td>{% endfor %}
+          <td class="num">{{ pair.low_52w }}</td><td class="num">{{ pair.high_52w }}</td></tr>
+      </table></div>
+    {% else %}
       <div class="notice warn">No rate history available yet — the next successful run will populate this chart.</div>
+    {% endif %}
   </div>
-  <div class="panel">
-    <h3>EUR / GBP — n/a</h3>
-    <p class="sub">Sterling per euro - drives UK revenue translation and UK-sourced cost.</p>
-      <div class="notice warn">No rate history available yet — the next successful run will populate this chart.</div>
-  </div>
+  {% endfor %}
 
   <h2>China → Europe container freight</h2>
+  {% if freight.any_data %}
+    {% for chart in freight.charts %}
+    <div class="panel">
+      <h3>{{ chart.title }}</h3>
+      <p class="sub">{{ chart.unit }} · {{ chart.series|length }} series tracked</p>
+      <div class="chartbox tall"><canvas id="chart-{{ chart.id }}"></canvas></div>
+    </div>
+    {% endfor %}
+    <div class="panel">
+      <h3>Freight table</h3>
+      <p class="sub">Latest published level and change over each window.</p>
+      <div class="tablewrap"><table class="data">
+        <tr><th>Lane / index</th><th class="num">Latest</th><th class="num">1w</th><th class="num">1m</th><th class="num">3m</th><th class="num">1y</th><th>As of</th></tr>
+        {% for lane in freight.rows %}
+        <tr>
+          <td>{% if lane.colour %}<span class="swatch" style="background:{{ lane.colour }}"></span>{% endif %}{{ lane.label }}</td>
+          <td class="num"><strong>{{ lane.value }}</strong></td>
+          {% for cell in lane.cells_full %}<td class="num {{ cell.cls }}">{{ cell.text }}</td>{% endfor %}
+          <td>{{ lane.as_of or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </table></div>
+    </div>
+  {% else %}
     <div class="notice warn">
       No container freight index published a readable value on this run. Freight publishers change their page markup from time to time;
       the collector tries Freightos FBX, Drewry WCI and the SCFI in turn and will backfill this chart as soon as one responds.
     </div>
+  {% endif %}
 
   <h2>Leading &amp; lagging economic indicators</h2>
+  {% for group in indicator_groups %}
+  <div class="panel">
+    <h3>{{ group.title }}</h3>
+    <p class="sub">{{ group.blurb }}</p>
+    <div class="tablewrap"><table class="data">
+      <tr><th>Indicator</th><th class="num">Latest</th><th class="num">vs prior</th><th class="num">vs year ago</th><th>As of</th><th>Source</th></tr>
+      {% for row in group.rows %}
+      <tr>
+        <td>{{ row.label }}<div class="meta">{{ row.why }}</div></td>
+        <td class="num"><strong>{{ row.value }}</strong></td>
+        <td class="num {{ row.cls }}">{{ row.arrow }} {{ row.change }}</td>
+        <td class="num {{ row.year_cls }}">{{ row.year_change }}</td>
+        <td>{{ row.as_of }}</td>
+        <td class="meta">{{ row.source }}</td>
+      </tr>
+      {% endfor %}
+    </table></div>
+  </div>
+  {% endfor %}
+  {% if not indicator_groups %}
     <div class="notice warn">Indicator sources did not respond on this run.</div>
+  {% endif %}
 
   <h2>Policy, tax, employment &amp; M&amp;A newsflow</h2>
   <div class="news">
+  {% for theme in news.themes %}
+    {% if theme['items'] %}
+    <div class="panel">
+      <h3>{{ theme.title }}</h3>
+      <p class="sub">{% if theme.widened %}Nothing in the last 36 hours — showing the past week.{% else %}Last 36 hours.{% endif %}</p>
+      {% for item in theme['items'] %}
+      <div class="item">
+        <a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title }}</a>
+        <div class="meta">
+          {% if item.official %}<span class="tag official">OFFICIAL</span> {% endif %}{{ item.source }} · {{ item.published_display }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endfor %}
   </div>
+  {% if news.total_shown == 0 %}
     <div class="notice warn">No news sources responded on this run.</div>
+  {% endif %}
 
   <footer>
     <div style="margin-bottom:10px">
-<span class="pill">ECB reference rates</span><span class="pill">Freightos FBX</span><span class="pill">Drewry WCI</span><span class="pill">SCFI</span><span class="pill">Eurostat</span><span class="pill">ONS (UK)</span><span class="pill">Stooq</span><span class="pill">GOV.UK</span><span class="pill">Revenue.ie</span><span class="pill">Rijksoverheid</span><span class="pill">Belgium FPS Finance</span><span class="pill">Google News</span>    </div>
-    Generated 10 Sep 2026 20:23 UTC · rebuilt automatically every morning and emailed to the distribution list.<br>
+      {% for source in sources %}<span class="pill">{{ source }}</span>{% endfor %}
+    </div>
+    Generated {{ generated_at }} · rebuilt automatically every morning and emailed to the distribution list.<br>
     Public data, collected for internal information only — not financial, tax or legal advice. Always confirm figures against the primary source before relying on them.
   </footer>
 </main>
 
-<script id="viz-data" type="application/json">{"charts":[]}</script>
+<script id="viz-data" type="application/json">{{ chart_data }}</script>
 <script>
 (function(){
   var KEY='mr-newsflow-theme';

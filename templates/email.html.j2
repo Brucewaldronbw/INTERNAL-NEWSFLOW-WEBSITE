@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ subject }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f9f9f7;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ preheader }}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f7;">
+<tr><td align="center" style="padding:20px 12px;">
+<table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:680px;max-width:100%;background:#fcfcfb;border:1px solid rgba(11,11,11,0.10);border-radius:10px;overflow:hidden;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+
+  <!-- header -->
+  <tr><td style="background:#0b0b0b;padding:22px 26px;">
+    <div style="color:#ffffff;font-size:19px;font-weight:700;letter-spacing:-0.2px;">Moyne Roberts — Morning Newsflow</div>
+    <div style="color:#c3c2b7;font-size:13px;padding-top:5px;">{{ date_long }} &nbsp;·&nbsp; FX · Freight · Tax &amp; policy · M&amp;A · Indicators</div>
+  </td></tr>
+
+  <!-- at a glance -->
+  <tr><td style="padding:24px 26px 6px;">
+    <div style="font-size:12px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:#898781;padding-bottom:12px;">At a glance</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+      {% for card in glance %}
+        <td width="33%" valign="top" style="padding:0 6px 12px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f7;border:1px solid #e1e0d9;border-radius:8px;">
+            <tr><td style="padding:12px 13px;">
+              <div style="font-size:11px;color:#52514e;font-weight:600;">{{ card.label }}</div>
+              <div style="font-size:21px;font-weight:700;color:#0b0b0b;padding-top:4px;">{{ card.value }}</div>
+              <div style="font-size:12px;font-weight:600;padding-top:3px;color:{{ card.colour }};">{{ card.arrow }} {{ card.change }}</div>
+              <div style="font-size:10px;color:#898781;padding-top:3px;">{{ card.note }}</div>
+            </td></tr>
+          </table>
+        </td>
+        {% if loop.index % 3 == 0 and not loop.last %}</tr><tr>{% endif %}
+      {% endfor %}
+      </tr>
+    </table>
+  </td></tr>
+
+  {% if summary_lines %}
+  <tr><td style="padding:6px 26px 18px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f7fd;border-left:3px solid #2a78d6;border-radius:0 6px 6px 0;">
+      <tr><td style="padding:14px 16px;">
+        <div style="font-size:12px;font-weight:700;color:#1c5cab;padding-bottom:7px;">WHAT MOVED</div>
+        {% for line in summary_lines %}
+        <div style="font-size:13px;line-height:1.55;color:#0b0b0b;padding-bottom:4px;">• {{ line }}</div>
+        {% endfor %}
+      </td></tr>
+    </table>
+  </td></tr>
+  {% endif %}
+
+  <!-- FX -->
+  <tr><td style="padding:8px 26px 0;">
+    <div style="font-size:16px;font-weight:700;color:#0b0b0b;border-top:1px solid #e1e0d9;padding-top:20px;">Foreign exchange</div>
+  </td></tr>
+  {% for pair in fx.pairs %}
+  <tr><td style="padding:14px 26px 4px;">
+    <div style="font-size:14px;font-weight:700;color:#0b0b0b;">{{ pair.label }}
+      <span style="font-weight:400;color:#52514e;">— {{ pair.value_fmt }}{% if pair.as_of %} ({{ pair.as_of }}){% endif %}</span></div>
+    <div style="font-size:12px;color:#52514e;padding-top:3px;">{{ pair.blurb }}</div>
+    {% if charts['fx_' ~ pair.key] %}
+      <img src="cid:fx_{{ pair.key }}" width="628" alt="{{ pair.label }} historical chart"
+           style="width:100%;max-width:628px;height:auto;display:block;margin:12px 0 4px;border:1px solid #e1e0d9;border-radius:6px;">
+    {% endif %}
+    <table role="presentation" cellpadding="0" cellspacing="0" style="font-size:12px;color:#52514e;">
+      <tr>{% for label, value in pair.change_row %}
+        <td style="padding:2px 14px 2px 0;">{{ label }} <strong style="color:{{ value.colour }};">{{ value.text }}</strong></td>
+      {% endfor %}</tr>
+    </table>
+  </td></tr>
+  {% endfor %}
+
+  <!-- freight -->
+  <tr><td style="padding:20px 26px 0;">
+    <div style="font-size:16px;font-weight:700;color:#0b0b0b;border-top:1px solid #e1e0d9;padding-top:20px;">China → Europe container freight</div>
+  </td></tr>
+  <tr><td style="padding:10px 26px 4px;">
+    {% if freight.any_data %}
+      {% if charts.freight_usd %}
+      <img src="cid:freight_usd" width="628" alt="China to Europe container freight rates chart"
+           style="width:100%;max-width:628px;height:auto;display:block;margin:6px 0 10px;border:1px solid #e1e0d9;border-radius:6px;">
+      {% endif %}
+      {% if charts.freight_index %}
+      <img src="cid:freight_index" width="628" alt="Shanghai Containerized Freight Index chart"
+           style="width:100%;max-width:628px;height:auto;display:block;margin:6px 0 10px;border:1px solid #e1e0d9;border-radius:6px;">
+      {% endif %}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12px;border-collapse:collapse;">
+        <tr style="background:#f9f9f7;">
+          <th align="left" style="padding:7px 9px;color:#52514e;border-bottom:1px solid #e1e0d9;">Lane / index</th>
+          <th align="right" style="padding:7px 9px;color:#52514e;border-bottom:1px solid #e1e0d9;">Latest</th>
+          <th align="right" style="padding:7px 9px;color:#52514e;border-bottom:1px solid #e1e0d9;">1w</th>
+          <th align="right" style="padding:7px 9px;color:#52514e;border-bottom:1px solid #e1e0d9;">1m</th>
+          <th align="right" style="padding:7px 9px;color:#52514e;border-bottom:1px solid #e1e0d9;">1y</th>
+        </tr>
+        {% for lane in freight.rows %}
+        <tr>
+          <td style="padding:7px 9px;color:#0b0b0b;border-bottom:1px solid #f0efec;">{{ lane.label }}</td>
+          <td align="right" style="padding:7px 9px;color:#0b0b0b;font-weight:700;border-bottom:1px solid #f0efec;">{{ lane.value }}</td>
+          {% for cell in lane.cells %}
+          <td align="right" style="padding:7px 9px;color:{{ cell.colour }};border-bottom:1px solid #f0efec;">{{ cell.text }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </table>
+    {% else %}
+      <div style="font-size:13px;color:#52514e;background:#fdf6ec;border-left:3px solid #eda100;padding:12px 14px;border-radius:0 6px 6px 0;">
+        No freight index published a readable value this morning. The dashboard keeps the last known reading and will backfill automatically on the next successful run.
+      </div>
+    {% endif %}
+  </td></tr>
+
+  <!-- indicators -->
+  <tr><td style="padding:20px 26px 0;">
+    <div style="font-size:16px;font-weight:700;color:#0b0b0b;border-top:1px solid #e1e0d9;padding-top:20px;">Leading &amp; lagging indicators</div>
+  </td></tr>
+  <tr><td style="padding:10px 26px 4px;">
+    {% if charts.movers %}
+    <img src="cid:movers" width="628" alt="Biggest indicator moves chart"
+         style="width:100%;max-width:628px;height:auto;display:block;margin:6px 0 12px;border:1px solid #e1e0d9;border-radius:6px;">
+    {% endif %}
+    {% for group in indicator_groups %}
+      <div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#898781;padding:10px 0 6px;">{{ group.title }}</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12px;border-collapse:collapse;">
+        {% for row in group.rows %}
+        <tr>
+          <td style="padding:6px 9px;color:#0b0b0b;border-bottom:1px solid #f0efec;">{{ row.label }}
+            <span style="color:#898781;">· {{ row.as_of }}</span></td>
+          <td align="right" style="padding:6px 9px;color:#0b0b0b;font-weight:700;border-bottom:1px solid #f0efec;white-space:nowrap;">{{ row.value }}</td>
+          <td align="right" style="padding:6px 9px;color:{{ row.colour }};border-bottom:1px solid #f0efec;white-space:nowrap;">{{ row.arrow }} {{ row.change }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endfor %}
+    {% if not indicator_groups %}
+      <div style="font-size:13px;color:#52514e;">Indicator sources did not respond this morning.</div>
+    {% endif %}
+  </td></tr>
+
+  <!-- news -->
+  <tr><td style="padding:20px 26px 0;">
+    <div style="font-size:16px;font-weight:700;color:#0b0b0b;border-top:1px solid #e1e0d9;padding-top:20px;">Policy, tax &amp; market newsflow</div>
+  </td></tr>
+  {% for theme in news.themes %}
+    {% if theme['items'] %}
+    <tr><td style="padding:16px 26px 0;">
+      <div style="font-size:13px;font-weight:700;color:#1c5cab;padding-bottom:2px;">{{ theme.title }}</div>
+      {% if theme.widened %}<div style="font-size:11px;color:#898781;padding-bottom:4px;">Nothing in the last 36 hours — showing the past week.</div>{% endif %}
+      {% for item in theme['items'] %}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid #f0efec;">
+        <tr><td style="padding:9px 0;">
+          <a href="{{ item.url }}" style="font-size:13.5px;line-height:1.45;color:#0b0b0b;text-decoration:none;font-weight:600;">{{ item.title }}</a>
+          <div style="font-size:11px;color:#898781;padding-top:3px;">
+            {% if item.official %}<span style="background:#e6f3ea;color:#006300;padding:1px 6px;border-radius:9px;font-weight:700;">OFFICIAL</span> {% endif %}
+            {{ item.source }} · {{ item.published_display }}
+          </div>
+        </td></tr>
+      </table>
+      {% endfor %}
+    </td></tr>
+    {% endif %}
+  {% endfor %}
+  {% if news.total_shown == 0 %}
+  <tr><td style="padding:12px 26px;"><div style="font-size:13px;color:#52514e;">No news sources responded this morning.</div></td></tr>
+  {% endif %}
+
+  <!-- footer -->
+  <tr><td style="padding:24px 26px 26px;">
+    <div style="border-top:1px solid #e1e0d9;padding-top:16px;">
+      {% if site_url %}
+      <a href="{{ site_url }}" style="display:inline-block;background:#0b0b0b;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:6px;">Open the live dashboard →</a>
+      {% endif %}
+      <div style="font-size:11px;color:#898781;line-height:1.6;padding-top:14px;">
+        Generated {{ generated_at }}. Sources: {{ source_note }}.<br>
+        Figures are collected from public data and are for internal information only — not financial, tax or legal advice.
+        {% if degraded %}<br><span style="color:#a15c00;">Note: {{ degraded }}</span>{% endif %}
+      </div>
+    </div>
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body></html>
