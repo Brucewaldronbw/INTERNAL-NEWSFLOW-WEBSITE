@@ -122,8 +122,10 @@ class DerivedSeriesTests(unittest.TestCase):
         from pipeline.fetchers.indicators import _difference
         ten_year = {"2026-07-01": 3.0, "2026-07-02": 3.1, "2026-07-03": 3.2}
         two_year = {"2026-07-01": 2.4, "2026-07-03": 3.4}
-        self.assertEqual(_difference(ten_year, two_year),
-                         {"2026-07-01": 0.6, "2026-07-03": -0.2})
+        spread = _difference(ten_year, two_year)
+        self.assertEqual(sorted(spread), ["2026-07-01", "2026-07-03"])
+        self.assertAlmostEqual(spread["2026-07-01"], 0.6)
+        self.assertAlmostEqual(spread["2026-07-03"], -0.2)
 
     def test_no_overlap_gives_an_empty_series_not_a_wrong_one(self):
         from pipeline.fetchers.indicators import _difference
