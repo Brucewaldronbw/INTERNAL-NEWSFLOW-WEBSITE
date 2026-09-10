@@ -56,7 +56,7 @@ def main() -> int:
                           lambda s=spec["yahoo"]: indicators._yahoo(s)))
         rows.append(probe(f"Stooq {spec['label']} (fallback)", "Indicators",
                           lambda s=spec["stooq"]: indicators._stooq(s)))
-    for spec in config.ECB_YIELD_SERIES:
+    for spec in config.ECB_SERIES:
         rows.append(probe(f"ECB {spec['label']}", "Indicators",
                           lambda s=spec["sdmx"]: indicators._ecb_series(s)))
     for spec in config.BOE_SERIES:

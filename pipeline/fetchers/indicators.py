@@ -219,6 +219,13 @@ def _ons_date(row: dict, bucket: str) -> str | None:
     return f"{year}-01-01"
 
 
+def _difference(left: dict[str, float], right: dict[str, float]) -> dict[str, float]:
+    """Subtract two series on the dates they share - a spread is only meaningful
+    where both legs actually have an observation."""
+    shared = left.keys() & right.keys()
+    return {date: left[date] - right[date] for date in sorted(shared)}
+
+
 # ------------------------------------------------------------------- main ----
 def fetch() -> dict:
     history = util.load_history("indicator_history")
@@ -230,11 +237,17 @@ def fetch() -> dict:
         history[spec["key"]] = merged
         series_out.append(_summarise(spec, merged, "daily", "Yahoo Finance / Stooq"))
 
-    for spec in config.ECB_YIELD_SERIES:
+    for spec in config.ECB_SERIES:
         data = _ecb_series(spec["sdmx"])
         merged = util.trim_series(util.merge_series(history.get(spec["key"], {}), data), 365 * 3)
         history[spec["key"]] = merged
         series_out.append(_summarise(spec, merged, "daily", "ECB"))
+
+    for spec in config.DERIVED_SERIES:
+        left, right = spec["minus"]
+        data = _difference(history.get(left, {}), history.get(right, {}))
+        history[spec["key"]] = data
+        series_out.append(_summarise(spec, data, "daily", "Derived from ECB"))
 
     for spec in config.BOE_SERIES:
         data = _boe(spec["code"])

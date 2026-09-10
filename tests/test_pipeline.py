@@ -117,6 +117,19 @@ class UnitTests(unittest.TestCase):
         self.assertEqual(render._signal({"unit": "pct", "change": 0.2, "change_pct": 1.5}), 1.5)
 
 
+class DerivedSeriesTests(unittest.TestCase):
+    def test_spread_uses_only_dates_both_legs_have(self):
+        from pipeline.fetchers.indicators import _difference
+        ten_year = {"2026-07-01": 3.0, "2026-07-02": 3.1, "2026-07-03": 3.2}
+        two_year = {"2026-07-01": 2.4, "2026-07-03": 3.4}
+        self.assertEqual(_difference(ten_year, two_year),
+                         {"2026-07-01": 0.6, "2026-07-03": -0.2})
+
+    def test_no_overlap_gives_an_empty_series_not_a_wrong_one(self):
+        from pipeline.fetchers.indicators import _difference
+        self.assertEqual(_difference({"2026-07-01": 3.0}, {"2026-08-01": 2.0}), {})
+
+
 class FxCardTests(unittest.TestCase):
     def setUp(self):
         self.series = {days_ago(n): 8.0 + n * 0.01 for n in range(0, 400)}
@@ -159,6 +172,55 @@ class FreightTests(unittest.TestCase):
         lane = _build_lane(config.FREIGHT_LANES[0], {}, None)
         self.assertIsNone(lane["value"])
         self.assertEqual(lane["points"], [])
+
+
+class DrewryScrapeTests(unittest.TestCase):
+    """Pinned against the wording Drewry's page actually served on 2026-09-10.
+    The figure appears before the lane name in one clause and after it in the
+    next, which is what the first version of this scraper got wrong."""
+
+    LIVE_TEXT = (
+        "Drewry's World Container Index remained stable at $4,476 per 40ft container. "
+        "On the Asia-Europe trade route, rates from Shanghai to Genoa fell 3% to "
+        "$4,216 per 40ft container while they decreased 2% to $3,997 per 40ft "
+        "container from Shanghai to Rotterdam."
+    )
+
+    def _extract(self, key: str, text: str):
+        import re
+        from pipeline.fetchers.freight import DREWRY_LANES
+        for pattern in DREWRY_LANES[key]:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return float(match.group(1).replace(",", ""))
+        return None
+
+    def test_composite(self):
+        self.assertEqual(self._extract("WCI_COMPOSITE", self.LIVE_TEXT), 4476.0)
+
+    def test_figure_after_the_lane_name(self):
+        self.assertEqual(self._extract("WCI_SHA_GOA", self.LIVE_TEXT), 4216.0)
+
+    def test_figure_before_the_lane_name(self):
+        self.assertEqual(self._extract("WCI_SHA_RTM", self.LIVE_TEXT), 3997.0)
+
+    def test_small_page_furniture_figures_are_not_mistaken_for_a_rate(self):
+        self.assertIsNone(self._extract("WCI_SHA_RTM", "Shanghai to Rotterdam, save $12 today"))
+
+    def test_out_of_band_figures_never_enter_the_series(self):
+        """A number that parses but cannot be a 40ft container rate is dropped
+        by the fetcher's sanity band, not silently charted."""
+        from unittest import mock
+        from pipeline.fetchers import freight
+
+        page = ("<p>Drewry's World Container Index remained stable at $4,476 per 40ft "
+                "container, while Shanghai to Rotterdam was quoted at $999,999.</p>")
+        response = mock.Mock(text=page)
+        with mock.patch.object(freight.util, "get", return_value=response):
+            found, source = freight._fetch_drewry()
+        self.assertEqual(found.get("WCI_COMPOSITE"), 4476.0)
+        self.assertNotIn("WCI_SHA_RTM", found)
+        self.assertIsNotNone(source)
 
 
 class NewsTests(unittest.TestCase):

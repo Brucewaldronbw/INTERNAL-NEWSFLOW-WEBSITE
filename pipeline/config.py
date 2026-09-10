@@ -190,6 +190,10 @@ RELEVANCE_BOOST = {
 # datacentre IPs, which is what CI and the scheduler run on); Stooq stays as a
 # fallback for the days Yahoo rate-limits. Bond yields come from the ECB and
 # the Bank of England, which publish them directly.
+# Best-effort only: both Yahoo and Stooq refuse the datacentre IP ranges that
+# CI and the scheduler run on, so these often return nothing and simply do not
+# appear in the brief. Everything the brief depends on comes from the ECB, the
+# Bank of England, Eurostat and the ONS below, which all answer reliably.
 MARKET_SERIES = [
     {"key": "brent", "yahoo": "BZ=F", "stooq": "cb.f", "label": "Brent crude (USD/bbl)",
      "class": "leading", "why": "Input cost & freight surcharge pressure"},
@@ -199,16 +203,32 @@ MARKET_SERIES = [
      "class": "leading", "why": "Equity market discounts future earnings"},
     {"key": "ftse", "yahoo": "^FTSE", "stooq": "^ukx", "label": "FTSE 100",
      "class": "leading", "why": "UK-weighted forward-looking demand signal"},
-    {"key": "eurusd", "yahoo": "EURUSD=X", "stooq": "eurusd", "label": "EUR / USD",
-     "class": "leading", "why": "Sets the euro cost of USD-denominated freight and commodities"},
 ]
 
 # Euro-area 10-year benchmark government yield, straight from the ECB yield
 # curve (the same API that serves the FX rates, so it is already proven).
-ECB_YIELD_SERIES = [
+ECB_SERIES = [
+    {"key": "eurusd", "sdmx": "EXR/D.USD.EUR.SP00.A", "label": "EUR / USD",
+     "class": "leading", "why": "Sets the euro cost of USD-priced freight and commodities"},
     {"key": "ea10y", "sdmx": "YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y",
      "label": "Euro area 10y benchmark yield (%)", "class": "leading", "unit": "pp",
      "why": "Euro-area growth & inflation expectations, and the cost of borrowing"},
+    {"key": "ea2y", "sdmx": "YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_2Y",
+     "label": "Euro area 2y benchmark yield (%)", "class": "leading", "unit": "pp",
+     "why": "Where the market thinks policy rates go next"},
+    {"key": "ea3m", "sdmx": "YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_3M",
+     "label": "Euro area 3m benchmark yield (%)", "class": "leading", "unit": "pp",
+     "why": "The short end - today's cost of working capital"},
+]
+
+# Derived from the series above rather than fetched. The 10y-2y slope is the
+# best-known single leading indicator of the cycle: it turns negative ahead of
+# slowdowns and steepens back through recoveries.
+DERIVED_SERIES = [
+    {"key": "ea_slope", "minus": ("ea10y", "ea2y"),
+     "label": "Euro area yield curve, 10y minus 2y (pp)",
+     "class": "leading", "unit": "pp",
+     "why": "Negative = the market is pricing a slowdown; steepening = recovery"},
 ]
 
 # Bank of England published statistics (CSV, no key).
@@ -231,10 +251,6 @@ EUROSTAT_SERIES = [
      "class": "lagging", "why": "Labour cost & availability", "unit": "pp",
      "params": {"unit": "PC_ACT", "s_adj": "SA", "age": "TOTAL", "sex": "T"},
      "geos": {"IE": "Ireland", "NL": "Netherlands", "BE": "Belgium", "EA": "Euro area"}},
-    {"key": "conf", "dataset": "ei_bsco_m_r2", "label": "Consumer confidence indicator",
-     "class": "leading", "why": "Survey-based turning-point signal",
-     "params": {"indic": "BS-CSMCI", "s_adj": "SA", "unit": "BAL"},
-     "geos": {"IE": "Ireland", "NL": "Netherlands", "BE": "Belgium", "EA": "Euro area"}},
 ]
 
 # ONS (UK) timeseries: (series id, dataset id)
@@ -249,7 +265,4 @@ ONS_SERIES = [
     {"key": "uk_gdp", "path": "economy/grossdomesticproductgdp/timeseries/ihyq/qna",
      "label": "UK GDP, quarterly % change", "class": "lagging",
      "why": "Headline UK activity", "unit": "pp"},
-    {"key": "uk_awe", "path": "employmentandlabourmarket/peopleinwork/earningsandworkinghours/timeseries/kai9/emp",
-     "label": "UK average weekly earnings, annual %", "class": "lagging",
-     "why": "The wage bill trend behind employment-cost planning", "unit": "pp"},
 ]

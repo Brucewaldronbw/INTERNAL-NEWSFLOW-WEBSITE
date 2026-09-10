@@ -96,10 +96,23 @@ def _fetch_fbx(code: str) -> tuple[dict[str, float], str | None]:
 
 
 # ---------------------------------------------------------------- Drewry ----
+# Drewry writes the figure on either side of the lane name depending on the
+# sentence ("rates from Shanghai to Genoa fell 3% to $4,216 per 40ft container
+# while they decreased 2% to $3,997 per 40ft container from Shanghai to
+# Rotterdam"), so each lane is tried in both directions.
 DREWRY_LANES = {
-    "WCI_COMPOSITE": r"composite\s*index[^$]{0,120}?\$\s*([0-9,]+)",
-    "WCI_SHA_RTM": r"Shanghai\s*(?:to|–|-|—)\s*Rotterdam[^$]{0,200}?\$\s*([0-9,]+)",
-    "WCI_SHA_GOA": r"Shanghai\s*(?:to|–|-|—)\s*Genoa[^$]{0,200}?\$\s*([0-9,]+)",
+    "WCI_COMPOSITE": [
+        r"(?:World\s+Container\s+Index|composite\s+index)[^$]{0,160}?\$\s*([0-9,]{3,9})",
+        r"\$\s*([0-9,]{3,9})[^$]{0,90}?(?:World\s+Container\s+Index|composite\s+index)",
+    ],
+    "WCI_SHA_RTM": [
+        r"Shanghai\s*(?:to|–|-|—)\s*Rotterdam[^$]{0,160}?\$\s*([0-9,]{3,9})",
+        r"\$\s*([0-9,]{3,9})[^$]{0,90}?from\s+Shanghai\s*(?:to|–|-|—)\s*Rotterdam",
+    ],
+    "WCI_SHA_GOA": [
+        r"Shanghai\s*(?:to|–|-|—)\s*Genoa[^$]{0,160}?\$\s*([0-9,]{3,9})",
+        r"\$\s*([0-9,]{3,9})[^$]{0,90}?from\s+Shanghai\s*(?:to|–|-|—)\s*Genoa",
+    ],
 }
 
 
@@ -118,30 +131,64 @@ def _fetch_drewry() -> tuple[dict[str, float], str | None]:
     text = re.sub(r"<[^>]+>", " ", resp.text)
     text = re.sub(r"\s+", " ", text)
     found: dict[str, float] = {}
-    for key, pattern in DREWRY_LANES.items():
-        m = re.search(pattern, text, re.IGNORECASE)
-        if m:
+    for key, patterns in DREWRY_LANES.items():
+        for pattern in patterns:
+            m = re.search(pattern, text, re.IGNORECASE)
+            if not m:
+                continue
             try:
-                found[key] = float(m.group(1).replace(",", ""))
+                value = float(m.group(1).replace(",", ""))
             except ValueError:
-                pass
+                continue
+            if 100 <= value <= 40000:      # sanity: a 40ft container rate in USD
+                found[key] = value
+                break
     if found:
         LOG.info("Drewry WCI: %s", found)
     return found, DREWRY_URL if found else None
 
 
 # ------------------------------------------------------------------ SCFI ----
+AJAX_URL = re.compile(r"""url\s*:\s*["']([^"']+)["']""")
+
+
 def _fetch_scfi() -> tuple[float | None, str | None]:
     resp = util.get(SCFI_URL, retries=2, headers=BROWSER_HEADERS)
     if resp is None:
         return None, None
-    text = re.sub(r"<[^>]+>", " ", resp.text)
+
+    # 1. the value may simply be in the served HTML
+    text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", resp.text))
     m = re.search(r"Comprehensive Index[^0-9]{0,80}([0-9][0-9,.]{2,10})", text, re.IGNORECASE)
     if m:
         try:
             return float(m.group(1).replace(",", "")), SCFI_URL
         except ValueError:
-            return None, None
+            pass
+
+    # 2. otherwise the page fills itself from an AJAX endpoint - use the one the
+    #    page itself names rather than guessing at a URL.
+    base = SCFI_URL.rsplit("/", 1)[0]
+    for endpoint in dict.fromkeys(AJAX_URL.findall(resp.text)):
+        if "index" not in endpoint.lower():
+            continue
+        url = endpoint if endpoint.startswith("http") else f"{base}/{endpoint.lstrip('./')}"
+        data = util.get(url, retries=1, headers=BROWSER_HEADERS,
+                        params={"indexName": "scfi"})
+        if data is None:
+            continue
+        try:
+            payload = data.json()
+        except ValueError:
+            continue
+        values: dict[str, float] = {}
+        _walk_for_series(payload, values)
+        if values:
+            LOG.info("SCFI via %s: %s points", url, len(values))
+            return values[max(values)], url
+        found = _num(str(payload))
+        if found:
+            return found, url
     return None, None
 
 

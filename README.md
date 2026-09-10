@@ -7,9 +7,9 @@ A self-updating dashboard and a 09:00 (Europe/Dublin) email covering:
 | **EUR/CNY** | spot rate, 1d/1w/1m/3m/1y change, 52-week range, 2-year chart | ECB euro reference rates → Frankfurter → open.er-api |
 | **EUR/GBP** | same | same |
 | **China → Europe freight** | FBX11, FBX13, Drewry WCI lanes (Shanghai→Rotterdam / Genoa), WCI composite, SCFI, with history | Freightos FBX → Drewry WCI → SSE/SCFI |
-| **Tax & policy newsflow** | Ireland, UK, Netherlands, Belgium — business tax, reliefs, employment law, employment taxes | 18 official government/regulator feeds + targeted Google News sweeps |
+| **Tax & policy newsflow** | Ireland, UK, Netherlands, Belgium — business tax, reliefs, employment law, employment taxes | GOV.UK Atom feeds (HMRC, Treasury, DBT, DWP, Companies House, ONS) + site-scoped sweeps of revenue.ie, gov.ie, cso.ie, rijksoverheid.nl, belastingdienst.nl, finance.belgium.be and others + topical news sweeps |
 | **Fire safety M&A** | acquisitions, mergers and PE activity in fire safety / fire protection across the UK and Europe | targeted Google News sweeps |
-| **Leading & lagging indicators** | Brent, copper, Euro Stoxx 50, FTSE 100, Bund and Gilt yields; HICP inflation, unemployment and economic sentiment for IE/NL/BE/euro area; UK CPIH, unemployment and GDP | Stooq, Eurostat, ONS |
+| **Leading & lagging indicators** | Brent, copper, Euro Stoxx 50, FTSE 100, EUR/USD; euro-area 10y yield, UK 10y gilt, Bank Rate; HICP inflation, unemployment and consumer confidence for IE/NL/BE/euro area; UK CPIH, unemployment, GDP and average weekly earnings | Yahoo Finance (Stooq fallback), ECB, Bank of England, Eurostat, ONS |
 
 Every source is free and needs no API key.
 
@@ -115,8 +115,21 @@ Every source is wrapped so that one bad morning cannot stop the brief:
 
 Freight is the fragile one: there is no free, stable public API for container
 spot rates, so the collector scrapes three public publishers in turn. If they
-all change their markup at once that section will report no reading until the
-selectors in `pipeline/fetchers/freight.py` are updated.
+all change their markup at once that section reports no reading until the
+selectors in `pipeline/fetchers/freight.py` are re-pinned —
+`python scripts/probe_freight.py` prints what each page actually serves, so
+that is evidence rather than guesswork.
+
+### Watching the sources
+
+Feeds get renamed and retired. `scripts/source_report.py` probes every
+configured source and prints a pass/fail table; it runs on every push and
+writes the table to the Actions job summary, so a section quietly emptying
+gets noticed. Run it locally any time with:
+
+```bash
+python scripts/source_report.py
+```
 
 ---
 
