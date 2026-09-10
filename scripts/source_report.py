@@ -51,20 +51,36 @@ def main() -> int:
     rows.append(probe("Drewry WCI", "Freight", lambda: freight._fetch_drewry()[0]))
     rows.append(probe("SSE / SCFI", "Freight", lambda: freight._fetch_scfi()[0]))
 
-    for spec in config.STOOQ_SERIES:
-        rows.append(probe(f"Stooq {spec['label']}", "Indicators",
-                          lambda s=spec["symbol"]: indicators._stooq(s)))
+    for spec in config.MARKET_SERIES:
+        rows.append(probe(f"Yahoo {spec['label']}", "Indicators",
+                          lambda s=spec["yahoo"]: indicators._yahoo(s)))
+        rows.append(probe(f"Stooq {spec['label']} (fallback)", "Indicators",
+                          lambda s=spec["stooq"]: indicators._stooq(s)))
+    for spec in config.ECB_YIELD_SERIES:
+        rows.append(probe(f"ECB {spec['label']}", "Indicators",
+                          lambda s=spec["sdmx"]: indicators._ecb_series(s)))
+    for spec in config.BOE_SERIES:
+        rows.append(probe(f"BoE {spec['label']}", "Indicators",
+                          lambda s=spec["code"]: indicators._boe(s)))
     for spec in config.EUROSTAT_SERIES:
         geo = next(iter(spec["geos"]))
         rows.append(probe(f"Eurostat {spec['dataset']} ({geo})", "Indicators",
                           lambda s=spec, g=geo: indicators._eurostat(s["dataset"], s["params"], g)))
     for spec in config.ONS_SERIES:
         rows.append(probe(f"ONS {spec['key']}", "Indicators",
-                          lambda s=spec: indicators._ons(s["series"], s["dataset"])))
+                          lambda s=spec: indicators._ons(s["path"])))
 
     for feed in config.OFFICIAL_FEEDS:
         rows.append(probe(f"{feed['country']} · {feed['source']}", "Official feeds",
                           lambda u=feed["url"], s=feed["source"], c=feed["country"]:
+                          news._parse_feed(u, official=True, source=s, country=c)))
+
+    for sweep in config.OFFICIAL_SITE_SWEEPS:
+        query = f'site:{sweep["site"]} ({sweep["terms"]})'
+        url = config.GOOGLE_NEWS.format(q=urllib.parse.quote(query))
+        rows.append(probe(f"{sweep['country']} · {sweep['source']} (site sweep)",
+                          "Official feeds",
+                          lambda u=url, s=sweep["source"], c=sweep["country"]:
                           news._parse_feed(u, official=True, source=s, country=c)))
 
     for theme in config.NEWS_THEMES:

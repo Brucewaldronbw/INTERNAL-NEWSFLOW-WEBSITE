@@ -133,6 +133,15 @@ def fetch() -> dict:
         LOG.info("official feed %s -> %s items", feed["source"], len(items))
         all_items.extend(items)
 
+    # ---- tier 1b: site-scoped sweeps of publishers with no working feed
+    for sweep in config.OFFICIAL_SITE_SWEEPS:
+        query = f'site:{sweep["site"]} ({sweep["terms"]})'
+        url = config.GOOGLE_NEWS.format(q=urllib.parse.quote(query))
+        items = _parse_feed(url, official=True, source=sweep["source"],
+                            country=sweep["country"])
+        LOG.info("official sweep %s -> %s items", sweep["source"], len(items))
+        all_items.extend(items)
+
     # ---- tier 2: themed Google News sweeps
     theme_hits: dict[str, list[dict]] = {t["key"]: [] for t in config.NEWS_THEMES}
     for theme in config.NEWS_THEMES:

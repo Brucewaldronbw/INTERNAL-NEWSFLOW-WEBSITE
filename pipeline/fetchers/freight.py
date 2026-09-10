@@ -80,7 +80,7 @@ def _to_iso(value) -> str | None:
 def _fetch_fbx(code: str) -> tuple[dict[str, float], str | None]:
     for template in FBX_CANDIDATES:
         url = template.format(code=code)
-        resp = util.get(url, retries=2)
+        resp = util.get(url, retries=2, headers=BROWSER_HEADERS)
         if resp is None:
             continue
         try:
@@ -103,8 +103,16 @@ DREWRY_LANES = {
 }
 
 
+BROWSER_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-GB,en;q=0.9",
+    "Cache-Control": "no-cache",
+}
+
+
 def _fetch_drewry() -> tuple[dict[str, float], str | None]:
-    resp = util.get(DREWRY_URL, retries=2)
+    # A bare request gets a 429 from Drewry's edge; it wants browser headers.
+    resp = util.get(DREWRY_URL, retries=2, headers=BROWSER_HEADERS)
     if resp is None:
         return {}, None
     text = re.sub(r"<[^>]+>", " ", resp.text)
@@ -124,7 +132,7 @@ def _fetch_drewry() -> tuple[dict[str, float], str | None]:
 
 # ------------------------------------------------------------------ SCFI ----
 def _fetch_scfi() -> tuple[float | None, str | None]:
-    resp = util.get(SCFI_URL, retries=2)
+    resp = util.get(SCFI_URL, retries=2, headers=BROWSER_HEADERS)
     if resp is None:
         return None, None
     text = re.sub(r"<[^>]+>", " ", resp.text)

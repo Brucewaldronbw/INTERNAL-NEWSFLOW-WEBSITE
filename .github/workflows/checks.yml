@@ -42,6 +42,10 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Probe every configured source
         run: python scripts/source_report.py
+      - name: Diagnose the freight sources
+        continue-on-error: true
+        run: python scripts/probe_freight.py
+
       - name: Build against live data (no email)
         run: python -m pipeline.run --no-email --out "${RUNNER_TEMP}/live"
       - uses: actions/upload-artifact@v4

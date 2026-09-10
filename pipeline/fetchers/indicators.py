@@ -21,13 +21,87 @@ from .. import config, util
 
 LOG = logging.getLogger("newsflow.indicators")
 
+YAHOO_URL = ("https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+             "?range=3y&interval=1d")
 STOOQ_URL = "https://stooq.com/q/d/l/?s={symbol}&i=d"
+ECB_SDMX_URL = "https://data-api.ecb.europa.eu/service/data/{key}?startPeriod={start}&format=csvdata"
+BOE_URL = ("https://www.bankofengland.co.uk/boeapps/database/fromshowcolumns.asp"
+           "?csv.x=yes&Datefrom={start}&Dateto=now&SeriesCodes={code}"
+           "&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N")
 EUROSTAT_URL = ("https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/"
                 "{dataset}?format=JSON&lang=EN&lastTimePeriod=30")
-ONS_URL = "https://api.ons.gov.uk/timeseries/{series}/dataset/{dataset}/data"
+ONS_URL = "https://www.ons.gov.uk/{path}/data"
 
 _MONTHS = {m: i for i, m in enumerate(
     ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"], 1)}
+
+
+# ------------------------------------------------------------------ Yahoo ----
+def _yahoo(symbol: str) -> dict[str, float]:
+    import urllib.parse
+    resp = util.get(YAHOO_URL.format(symbol=urllib.parse.quote(symbol)), retries=2)
+    if resp is None:
+        return {}
+    try:
+        result = resp.json()["chart"]["result"][0]
+        stamps = result["timestamp"]
+        closes = result["indicators"]["quote"][0]["close"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return {}
+    out: dict[str, float] = {}
+    for stamp, close in zip(stamps, closes):
+        if close is None:
+            continue
+        try:
+            out[dt.datetime.utcfromtimestamp(stamp).date().isoformat()] = float(close)
+        except (OverflowError, OSError, ValueError):
+            continue
+    return dict(sorted(out.items()))
+
+
+def _market(spec: dict) -> dict[str, float]:
+    return _yahoo(spec["yahoo"]) or _stooq(spec["stooq"])
+
+
+# -------------------------------------------------------------------- ECB ----
+def _ecb_series(key: str) -> dict[str, float]:
+    start = (dt.date.today() - dt.timedelta(days=365 * 3)).isoformat()
+    resp = util.get(ECB_SDMX_URL.format(key=key, start=start), retries=2)
+    if resp is None:
+        return {}
+    out: dict[str, float] = {}
+    try:
+        for row in csv.DictReader(io.StringIO(resp.text)):
+            period, value = row.get("TIME_PERIOD"), row.get("OBS_VALUE")
+            if period and value not in (None, "", "NaN"):
+                out[_normalise_period(period)] = float(value)
+    except (ValueError, csv.Error):
+        return {}
+    return dict(sorted(out.items()))
+
+
+# -------------------------------------------------------------------- BoE ----
+def _boe(code: str) -> dict[str, float]:
+    start = (dt.date.today() - dt.timedelta(days=365 * 3)).strftime("%d/%b/%Y")
+    resp = util.get(BOE_URL.format(code=code, start=start), retries=2)
+    if resp is None or "," not in resp.text[:400]:
+        return {}
+    out: dict[str, float] = {}
+    try:
+        for row in csv.DictReader(io.StringIO(resp.text)):
+            date = row.get("DATE") or row.get("Date")
+            value = row.get(code) or next(
+                (v for k, v in row.items() if k not in ("DATE", "Date")), None)
+            if not date or value in (None, "", "ND"):
+                continue
+            try:
+                iso = dt.datetime.strptime(date.strip(), "%d %b %Y").date().isoformat()
+            except ValueError:
+                continue
+            out[iso] = float(value)
+    except (ValueError, csv.Error):
+        return {}
+    return dict(sorted(out.items()))
 
 
 # ------------------------------------------------------------------ Stooq ----
@@ -106,8 +180,8 @@ def _normalise_period(period: str) -> str:
 
 
 # -------------------------------------------------------------------- ONS ----
-def _ons(series: str, dataset: str) -> dict[str, float]:
-    resp = util.get(ONS_URL.format(series=series, dataset=dataset), retries=2)
+def _ons(path: str) -> dict[str, float]:
+    resp = util.get(ONS_URL.format(path=path.strip("/")), retries=2)
     if resp is None:
         return {}
     try:
@@ -150,12 +224,23 @@ def fetch() -> dict:
     history = util.load_history("indicator_history")
     series_out: list[dict] = []
 
-    for spec in config.STOOQ_SERIES:
-        data = _stooq(spec["symbol"])
-        merged = util.merge_series(history.get(spec["key"], {}), data)
-        merged = util.trim_series(merged, 365 * 3)
+    for spec in config.MARKET_SERIES:
+        data = _market(spec)
+        merged = util.trim_series(util.merge_series(history.get(spec["key"], {}), data), 365 * 3)
         history[spec["key"]] = merged
-        series_out.append(_summarise(spec, merged, "daily", "Stooq"))
+        series_out.append(_summarise(spec, merged, "daily", "Yahoo Finance / Stooq"))
+
+    for spec in config.ECB_YIELD_SERIES:
+        data = _ecb_series(spec["sdmx"])
+        merged = util.trim_series(util.merge_series(history.get(spec["key"], {}), data), 365 * 3)
+        history[spec["key"]] = merged
+        series_out.append(_summarise(spec, merged, "daily", "ECB"))
+
+    for spec in config.BOE_SERIES:
+        data = _boe(spec["code"])
+        merged = util.trim_series(util.merge_series(history.get(spec["key"], {}), data), 365 * 3)
+        history[spec["key"]] = merged
+        series_out.append(_summarise(spec, merged, "daily", "Bank of England"))
 
     for spec in config.EUROSTAT_SERIES:
         for geo, geo_label in spec["geos"].items():
@@ -168,7 +253,7 @@ def fetch() -> dict:
                 merged, "monthly", "Eurostat"))
 
     for spec in config.ONS_SERIES:
-        data = _ons(spec["series"], spec["dataset"])
+        data = _ons(spec["path"])
         merged = util.merge_series(history.get(spec["key"], {}), data)
         history[spec["key"]] = merged
         series_out.append(_summarise(spec, merged, "monthly", "ONS (UK)"))

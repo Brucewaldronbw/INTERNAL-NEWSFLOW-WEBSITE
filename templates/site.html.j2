@@ -58,7 +58,8 @@ h2{font-size:13px;letter-spacing:1.1px;text-transform:uppercase;color:var(--mute
 .panel .sub{margin:0 0 14px;font-size:12.5px;color:var(--ink-2)}
 .chartbox{position:relative;height:290px}
 .chartbox.tall{height:330px}
-table.data{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+.tablewrap{overflow-x:auto;margin-top:14px;-webkit-overflow-scrolling:touch}
+table.data{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
 table.data th{text-align:left;color:var(--ink-2);font-weight:600;font-size:11.5px;letter-spacing:.4px;
   text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--grid)}
 table.data td{padding:9px 10px;border-bottom:1px solid var(--wash)}
@@ -79,7 +80,9 @@ table.data tr:last-child td{border-bottom:0}
 .warn a{color:inherit}
 footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--grid);font-size:12px;color:var(--muted);line-height:1.7}
 .pill{display:inline-block;font-size:11px;color:var(--ink-2);background:var(--wash);border-radius:999px;padding:3px 10px;margin:0 6px 6px 0}
-@media(max-width:640px){.chartbox{height:240px}.card .val{font-size:23px}}
+@media(max-width:640px){.chartbox{height:240px}.card .val{font-size:23px}
+  .panel{padding:15px 14px}.wrap{padding:0 14px 48px}
+  h2{margin:30px 0 12px}}
 </style>
 </head>
 <body>
@@ -121,12 +124,12 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--grid);font-si
     <p class="sub">{{ pair.blurb }}{% if pair.as_of %} · ECB reference rate, {{ pair.as_of }} · {{ pair.observations }} observations{% endif %}</p>
     {% if pair.points %}
       <div class="chartbox"><canvas id="chart-fx-{{ pair.key }}"></canvas></div>
-      <table class="data">
+      <div class="tablewrap"><table class="data">
         <tr><th>Window</th>{% for label, _ in pair.change_row %}<th class="num">{{ label }}</th>{% endfor %}<th class="num">52w low</th><th class="num">52w high</th></tr>
         <tr><td>Change</td>
           {% for _, value in pair.change_row %}<td class="num {{ value.cls }}">{{ value.text }}</td>{% endfor %}
           <td class="num">{{ pair.low_52w }}</td><td class="num">{{ pair.high_52w }}</td></tr>
-      </table>
+      </table></div>
     {% else %}
       <div class="notice warn">No rate history available yet — the next successful run will populate this chart.</div>
     {% endif %}
@@ -145,7 +148,7 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--grid);font-si
     <div class="panel">
       <h3>Freight table</h3>
       <p class="sub">Latest published level and change over each window.</p>
-      <table class="data">
+      <div class="tablewrap"><table class="data">
         <tr><th>Lane / index</th><th class="num">Latest</th><th class="num">1w</th><th class="num">1m</th><th class="num">3m</th><th class="num">1y</th><th>As of</th></tr>
         {% for lane in freight.rows %}
         <tr>
@@ -155,7 +158,7 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--grid);font-si
           <td>{{ lane.as_of or '—' }}</td>
         </tr>
         {% endfor %}
-      </table>
+      </table></div>
     </div>
   {% else %}
     <div class="notice warn">
@@ -169,7 +172,7 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--grid);font-si
   <div class="panel">
     <h3>{{ group.title }}</h3>
     <p class="sub">{{ group.blurb }}</p>
-    <table class="data">
+    <div class="tablewrap"><table class="data">
       <tr><th>Indicator</th><th class="num">Latest</th><th class="num">vs prior</th><th class="num">vs year ago</th><th>As of</th><th>Source</th></tr>
       {% for row in group.rows %}
       <tr>
@@ -181,7 +184,7 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--grid);font-si
         <td class="meta">{{ row.source }}</td>
       </tr>
       {% endfor %}
-    </table>
+    </table></div>
   </div>
   {% endfor %}
   {% if not indicator_groups %}

@@ -49,48 +49,53 @@ FREIGHT_LANES = [
 # authoritative sources and are always ranked above sweeper results.
 GOOGLE_NEWS = "https://news.google.com/rss/search?q={q}&hl=en-IE&gl=IE&ceid=IE:en"
 
+# Direct feeds, kept only where the publisher actually serves a working one.
+# GOV.UK's Atom search is the gold standard here - it is stable and complete.
 OFFICIAL_FEEDS = [
-    # Ireland
-    {"country": "IE", "source": "Revenue.ie (Irish Revenue)",
-     "url": "https://www.revenue.ie/en/corporate/press-office/news/rss.xml"},
-    {"country": "IE", "source": "Department of Finance (IE)",
-     "url": "https://www.gov.ie/en/organisation-information/9e7062-department-of-finance-press-releases/rss.xml"},
-    {"country": "IE", "source": "Department of Enterprise, Tourism & Employment (IE)",
-     "url": "https://www.gov.ie/en/organisation-information/61d3a-department-of-enterprise-trade-and-employment-press-releases/rss.xml"},
-    {"country": "IE", "source": "Workplace Relations Commission",
-     "url": "https://www.workplacerelations.ie/en/news-media/rss.xml"},
-    {"country": "IE", "source": "Central Statistics Office (IE)",
-     "url": "https://www.cso.ie/en/statistics/rss.xml"},
-    # United Kingdom
     {"country": "UK", "source": "HMRC (GOV.UK)",
      "url": "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=hm-revenue-customs"},
     {"country": "UK", "source": "HM Treasury (GOV.UK)",
      "url": "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=hm-treasury"},
     {"country": "UK", "source": "Dept for Business & Trade (GOV.UK)",
      "url": "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=department-for-business-and-trade"},
-    {"country": "UK", "source": "Employment law & pay (GOV.UK)",
-     "url": "https://www.gov.uk/search/news-and-communications.atom?topical_events%5B%5D=&keywords=employment+law"},
+    {"country": "UK", "source": "Dept for Work & Pensions (GOV.UK)",
+     "url": "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=department-for-work-pensions"},
+    {"country": "UK", "source": "Companies House (GOV.UK)",
+     "url": "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=companies-house"},
     {"country": "UK", "source": "Office for National Statistics",
      "url": "https://www.ons.gov.uk/releasecalendar?rss"},
-    # Netherlands
-    {"country": "NL", "source": "Rijksoverheid - Financiën",
-     "url": "https://www.rijksoverheid.nl/ministeries/ministerie-van-financien/nieuws/rss"},
-    {"country": "NL", "source": "Rijksoverheid - Sociale Zaken & Werkgelegenheid",
-     "url": "https://www.rijksoverheid.nl/ministeries/ministerie-van-sociale-zaken-en-werkgelegenheid/nieuws/rss"},
-    {"country": "NL", "source": "Belastingdienst / Rijksoverheid Belastingen",
-     "url": "https://www.rijksoverheid.nl/onderwerpen/belastingen/nieuws/rss"},
-    {"country": "NL", "source": "CBS (Statistics Netherlands)",
-     "url": "https://www.cbs.nl/en-gb/rss"},
-    # Belgium
-    {"country": "BE", "source": "Belgium.be news",
-     "url": "https://www.belgium.be/en/rss/news.xml"},
-    {"country": "BE", "source": "FPS Finance (Belgium)",
-     "url": "https://finance.belgium.be/en/rss.xml"},
-    {"country": "BE", "source": "National Bank of Belgium",
-     "url": "https://www.nbb.be/en/rss/press-releases"},
-    # EU-wide
+]
+
+# Ireland, the Netherlands, Belgium and the Commission either do not publish a
+# public RSS feed any more or have moved it (every candidate returned 404 or an
+# empty document when probed). Rather than ship dead feeds, those publishers are
+# reached through site-scoped news queries, which return the same primary-source
+# articles and are marked OFFICIAL in the brief. `scripts/source_report.py`
+# re-checks all of this, so a feed that comes back can be promoted above.
+OFFICIAL_SITE_SWEEPS = [
+    {"country": "IE", "source": "Revenue.ie (Irish Revenue)", "site": "revenue.ie",
+     "terms": "tax OR VAT OR relief OR employer OR compliance"},
+    {"country": "IE", "source": "gov.ie (Irish Government)", "site": "gov.ie",
+     "terms": "tax OR budget OR employment OR business OR enterprise"},
+    {"country": "IE", "source": "Central Statistics Office (IE)", "site": "cso.ie",
+     "terms": "inflation OR employment OR earnings OR economy"},
+    {"country": "IE", "source": "Workplace Relations Commission", "site": "workplacerelations.ie",
+     "terms": "employment OR wage OR employer OR dispute"},
+    {"country": "NL", "source": "Rijksoverheid (NL Government)", "site": "rijksoverheid.nl",
+     "terms": "belasting OR ondernemers OR arbeidsmarkt OR loon"},
+    {"country": "NL", "source": "Belastingdienst", "site": "belastingdienst.nl",
+     "terms": "belasting OR ondernemer OR loonheffing"},
+    {"country": "NL", "source": "CBS (Statistics Netherlands)", "site": "cbs.nl",
+     "terms": "inflatie OR werkloosheid OR economie OR lonen"},
+    {"country": "BE", "source": "FPS Finance (Belgium)", "site": "finance.belgium.be",
+     "terms": "tax OR belasting OR impot OR company"},
+    {"country": "BE", "source": "Belgium.be", "site": "belgium.be",
+     "terms": "tax OR employment OR business OR wage"},
+    {"country": "BE", "source": "National Bank of Belgium", "site": "nbb.be",
+     "terms": "economy OR inflation OR business OR credit"},
     {"country": "EU", "source": "European Commission - Taxation & Customs",
-     "url": "https://taxation-customs.ec.europa.eu/rss_en"},
+     "site": "taxation-customs.ec.europa.eu",
+     "terms": "tax OR VAT OR customs OR directive"},
 ]
 
 # Topical sweeps run through Google News. Each becomes a "theme" on the site.
@@ -181,20 +186,39 @@ RELEVANCE_BOOST = {
 }
 
 # ------------------------------------------------------- economic indicators --
-# Market-derived series (Stooq CSV, no API key required).
-STOOQ_SERIES = [
-    {"key": "brent", "symbol": "cb.f", "label": "Brent crude (USD/bbl)",
+# Market-derived series. Yahoo's chart endpoint is the primary (Stooq refuses
+# datacentre IPs, which is what CI and the scheduler run on); Stooq stays as a
+# fallback for the days Yahoo rate-limits. Bond yields come from the ECB and
+# the Bank of England, which publish them directly.
+MARKET_SERIES = [
+    {"key": "brent", "yahoo": "BZ=F", "stooq": "cb.f", "label": "Brent crude (USD/bbl)",
      "class": "leading", "why": "Input cost & freight surcharge pressure"},
-    {"key": "copper", "symbol": "hg.f", "label": "Copper (USD/lb)",
+    {"key": "copper", "yahoo": "HG=F", "stooq": "hg.f", "label": "Copper (USD/lb)",
      "class": "leading", "why": "Classic 'Dr Copper' global demand gauge"},
-    {"key": "stoxx", "symbol": "^stx50", "label": "Euro Stoxx 50",
+    {"key": "stoxx", "yahoo": "^STOXX50E", "stooq": "^stx50", "label": "Euro Stoxx 50",
      "class": "leading", "why": "Equity market discounts future earnings"},
-    {"key": "ftse", "symbol": "^ukx", "label": "FTSE 100",
+    {"key": "ftse", "yahoo": "^FTSE", "stooq": "^ukx", "label": "FTSE 100",
      "class": "leading", "why": "UK-weighted forward-looking demand signal"},
-    {"key": "de10y", "symbol": "10deuy.b", "label": "German 10y Bund yield (%)",
-     "class": "leading", "why": "Euro-area growth & inflation expectations", "unit": "pp"},
-    {"key": "uk10y", "symbol": "10ukuy.b", "label": "UK 10y Gilt yield (%)",
-     "class": "leading", "why": "UK borrowing cost & fiscal risk premium", "unit": "pp"},
+    {"key": "eurusd", "yahoo": "EURUSD=X", "stooq": "eurusd", "label": "EUR / USD",
+     "class": "leading", "why": "Sets the euro cost of USD-denominated freight and commodities"},
+]
+
+# Euro-area 10-year benchmark government yield, straight from the ECB yield
+# curve (the same API that serves the FX rates, so it is already proven).
+ECB_YIELD_SERIES = [
+    {"key": "ea10y", "sdmx": "YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y",
+     "label": "Euro area 10y benchmark yield (%)", "class": "leading", "unit": "pp",
+     "why": "Euro-area growth & inflation expectations, and the cost of borrowing"},
+]
+
+# Bank of England published statistics (CSV, no key).
+BOE_SERIES = [
+    {"key": "uk10y", "code": "IUDMNZC", "label": "UK 10y gilt yield (%)",
+     "class": "leading", "unit": "pp",
+     "why": "UK borrowing cost & fiscal risk premium"},
+    {"key": "uk_bank_rate", "code": "IUDBEDR", "label": "Bank of England Bank Rate (%)",
+     "class": "lagging", "unit": "pp",
+     "why": "Sets the floor under UK borrowing costs"},
 ]
 
 # Eurostat (free, no key). Dataset -> filter. Monthly series.
@@ -207,21 +231,25 @@ EUROSTAT_SERIES = [
      "class": "lagging", "why": "Labour cost & availability", "unit": "pp",
      "params": {"unit": "PC_ACT", "s_adj": "SA", "age": "TOTAL", "sex": "T"},
      "geos": {"IE": "Ireland", "NL": "Netherlands", "BE": "Belgium", "EA": "Euro area"}},
-    {"key": "esi", "dataset": "ei_bssi_m_r2", "label": "Economic sentiment / confidence",
+    {"key": "conf", "dataset": "ei_bsco_m_r2", "label": "Consumer confidence indicator",
      "class": "leading", "why": "Survey-based turning-point signal",
-     "params": {"indic": "BS-ESI-I", "s_adj": "SA", "unit": "I-BCI"},
+     "params": {"indic": "BS-CSMCI", "s_adj": "SA", "unit": "BAL"},
      "geos": {"IE": "Ireland", "NL": "Netherlands", "BE": "Belgium", "EA": "Euro area"}},
 ]
 
 # ONS (UK) timeseries: (series id, dataset id)
 ONS_SERIES = [
-    {"key": "uk_cpih", "series": "l55o", "dataset": "mm23",
+    {"key": "uk_cpih", "path": "economy/inflationandpriceindices/timeseries/l55o/mm23",
      "label": "UK CPIH inflation, annual %", "class": "lagging",
      "why": "Drives UK pay settlements and thresholds", "unit": "pp"},
-    {"key": "uk_unemp", "series": "mgsx", "dataset": "lms",
+    {"key": "uk_unemp",
+     "path": "employmentandlabourmarket/peoplenotinwork/unemployment/timeseries/mgsx/lms",
      "label": "UK unemployment rate, %", "class": "lagging",
      "why": "UK labour market slack", "unit": "pp"},
-    {"key": "uk_gdp", "series": "ihyq", "dataset": "qna",
+    {"key": "uk_gdp", "path": "economy/grossdomesticproductgdp/timeseries/ihyq/qna",
      "label": "UK GDP, quarterly % change", "class": "lagging",
      "why": "Headline UK activity", "unit": "pp"},
+    {"key": "uk_awe", "path": "employmentandlabourmarket/peopleinwork/earningsandworkinghours/timeseries/kai9/emp",
+     "label": "UK average weekly earnings, annual %", "class": "lagging",
+     "why": "The wage bill trend behind employment-cost planning", "unit": "pp"},
 ]
