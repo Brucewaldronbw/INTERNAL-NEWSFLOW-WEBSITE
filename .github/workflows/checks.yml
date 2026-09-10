@@ -27,3 +27,27 @@ jobs:
           name: preview
           path: ${{ runner.temp }}/preview
           retention-days: 7
+
+  sources:
+    # Probes every real publisher and writes a health table to the job summary.
+    # Feeds move and get retired, so this is how a broken source is noticed
+    # before it quietly empties a section of the brief.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Probe every configured source
+        run: python scripts/source_report.py
+      - name: Build against live data (no email)
+        run: python -m pipeline.run --no-email --out "${RUNNER_TEMP}/live"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: live-site
+          path: |
+            ${{ runner.temp }}/live
+            data
+          retention-days: 7
